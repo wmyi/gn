@@ -3,10 +3,6 @@ package master
 import (
 	"context"
 	"flag"
-	"gn/config"
-	"gn/glog"
-	"gn/gnError"
-	"gn/linker"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -14,6 +10,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/wmyi/gn/glog"
+	"github.com/wmyi/gn/gnError"
+	"github.com/wmyi/gn/linker"
+
+	"github.com/wmyi/gn/config"
 
 	"github.com/golang/protobuf/proto"
 	jsoniter "github.com/json-iterator/go"

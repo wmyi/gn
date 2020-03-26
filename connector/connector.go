@@ -3,10 +3,6 @@ package connector
 import (
 	"context"
 	"flag"
-	"gn/config"
-	"gn/glog"
-	"gn/gnError"
-	"gn/linker"
 	"hash/crc32"
 	"net/http"
 	"os"
@@ -15,7 +11,12 @@ import (
 	"strings"
 	"sync"
 
-	"gn/gn.app"
+	"github.com/wmyi/gn/config"
+	"github.com/wmyi/gn/glog"
+	"github.com/wmyi/gn/gnError"
+	"github.com/wmyi/gn/linker"
+
+	"github.com/wmyi/gn/gn"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"
