@@ -1,0 +1,28 @@
+syntax = "proto3";
+package config;
+
+
+
+message TSession {
+  string cid =1;
+  string srcSubRouter = 2;
+  string dstSubRouter =3;
+  bytes body =4;
+  enum sessionType{
+    CONNECTOR  = 0;
+    LOGIC  = 1;
+    CMD  = 2;
+  }
+  sessionType  st  =5;
+  string replyToken = 6;
+  string router =7;
+ string logicBindId = 8; 
+}
+
+
+message CmdMsg {
+  int64 runRoutineNum =1;
+  bytes data =2;
+}
+
+
