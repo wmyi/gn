@@ -1,9 +1,10 @@
 package master
 
 import (
-	"gn/glog"
-	"gn/gnError"
 	"runtime"
+
+	"github.com/wmyi/gn/glog"
+	"github.com/wmyi/gn/gnError"
 )
 
 type CmdHandlerFunc func(cmd, nodeId string, date []byte)

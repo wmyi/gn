@@ -1,10 +1,11 @@
 package linker
 
 import (
-	"gn/config"
-	"gn/glog"
-	"gn/gnError"
 	"strconv"
+
+	"github.com/wmyi/gn/config"
+	"github.com/wmyi/gn/glog"
+	"github.com/wmyi/gn/gnError"
 
 	"github.com/nats-io/nats.go"
 )

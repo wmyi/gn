@@ -2,12 +2,13 @@ package glog
 
 import (
 	"fmt"
-	"gn/config"
 	"io"
 	"log"
 	"os"
 	"path"
 	"sync"
+
+	"github.com/wmyi/gn/config"
 )
 
 const (

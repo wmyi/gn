@@ -3,16 +3,17 @@ package gn
 import (
 	"context"
 	"flag"
-	"gn/config"
-	"gn/glog"
-	"gn/gnError"
-	"gn/linker"
 	"os"
 	"runtime/debug"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/wmyi/gn/config"
+	"github.com/wmyi/gn/glog"
+	"github.com/wmyi/gn/gnError"
+	"github.com/wmyi/gn/linker"
 
 	"github.com/golang/protobuf/proto"
 	jsoniter "github.com/json-iterator/go"

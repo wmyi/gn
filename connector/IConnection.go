@@ -2,9 +2,10 @@ package connector
 
 import (
 	"context"
-	"gn/glog"
-	"gn/gnError"
-	"gn/linker"
+
+	"github.com/wmyi/gn/glog"
+	"github.com/wmyi/gn/gnError"
+	"github.com/wmyi/gn/linker"
 )
 
 // client Connection  interface

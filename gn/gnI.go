@@ -1,11 +1,12 @@
 package gn
 
 import (
-	"gn/config"
-	"gn/glog"
-	"gn/gnError"
-	"gn/linker"
 	"sync"
+
+	"github.com/wmyi/gn/config"
+	"github.com/wmyi/gn/glog"
+	"github.com/wmyi/gn/gnError"
+	"github.com/wmyi/gn/linker"
 )
 
 type HandlerFunc func(IPack)

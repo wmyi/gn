@@ -3,12 +3,13 @@ package connector
 import (
 	"bytes"
 	"context"
-	"gn/glog"
-	"gn/gnError"
 	"runtime/debug"
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	"github.com/wmyi/gn/glog"
+	"github.com/wmyi/gn/gnError"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"

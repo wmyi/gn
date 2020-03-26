@@ -2,8 +2,9 @@ package gnError
 
 import (
 	"context"
-	"gn/glog"
 	"runtime/debug"
+
+	"github.com/wmyi/gn/glog"
 )
 
 type ExceptionHandleFunc func(exception *GnException)

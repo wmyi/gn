@@ -1,9 +1,10 @@
 package gnutil
 
 import (
-	"gn/config"
-	"gn/gnError"
 	"hash/crc32"
+
+	"github.com/wmyi/gn/config"
+	"github.com/wmyi/gn/gnError"
 )
 
 func RPCcalculatorServerId(calculateId string, serverList []*config.ServersConfig) (string, error) {
