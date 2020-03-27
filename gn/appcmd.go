@@ -6,10 +6,11 @@ import (
 	"sync"
 
 	"context"
-	"gn/config"
-	"gn/glog"
-	"gn/gnError"
-	"gn/linker"
+
+	"github.com/wmyi/gn/config"
+	"github.com/wmyi/gn/glog"
+	"github.com/wmyi/gn/gnError"
+	"github.com/wmyi/gn/linker"
 
 	"github.com/golang/protobuf/proto"
 )

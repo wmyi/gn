@@ -77,7 +77,10 @@ func (wc *WSConnection) ReadMsg(ctx context.Context) {
 		default:
 			break
 		}
-		_, message, err := wc.wsConn.ReadMessage()
+		msgType, message, err := wc.wsConn.ReadMessage()
+		if msgType == websocket.BinaryMessage {
+
+		}
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				wc.logger.Errorf("ws  soeckt Read err- ", err)
