@@ -38,7 +38,7 @@ func (p *Pack) GetAPP() IApp {
 	return p.app
 }
 func (p *Pack) GetData() []byte {
-	return p.resultbytes
+	return p.ts.GetBody()
 }
 func (p *Pack) SetHandlersTranferObj(decodOjb interface{}) {
 	if decodOjb != nil {
