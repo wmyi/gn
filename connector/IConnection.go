@@ -14,13 +14,12 @@ type IConnection interface {
 	Run()
 	Done()
 	// for  read  or   write msg
-	WriteMsg()
-	ReadMsg()
+	WriteMsg(ctx context.Context)
+	ReadMsg(ctx context.Context)
 	GetConnectionCid() string
 	GetConnection() interface{}
 	SetBindId(bindId string)
 	GetBindId() string
-	addRouterRearEndHandler(serverType string, handler RouteRearEndHFunc)
 }
 
 // connector interface
