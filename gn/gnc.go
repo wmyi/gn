@@ -1,6 +1,7 @@
 package gn
 
 import (
+	"github.com/golang/protobuf/proto"
 	"github.com/wmyi/gn/config"
 	"github.com/wmyi/gn/glog"
 )
@@ -54,9 +55,29 @@ func (p *Pack) GetRouter() string {
 	return p.ts.GetRouter()
 }
 func (p *Pack) ResultJson(obj interface{}) {
-
+	if obj != nil {
+		out, err := jsonI.Marshal(obj)
+		if err != nil {
+			p.app.GetLoger().Errorf("Pack  ResultJson  jsonI.Marshal  err  ", err)
+			return
+		}
+		p.resultbytes = out
+	}
 }
 func (p *Pack) ResultProtoBuf(obj interface{}) {
+	if obj != nil {
+		pbObj, ok := obj.(proto.Message)
+		if !ok {
+			p.app.GetLoger().Errorf("Pack  ResultProtoBuf  obj is no proto.Message  type    ")
+			return
+		}
+		out, err := proto.Marshal(pbObj)
+		if err != nil {
+			p.app.GetLoger().Errorf("Pack  ResultJson  proto.Buffer.Marshal  err     ", err)
+			return
+		}
+		p.resultbytes = out
+	}
 
 }
 func (p *Pack) ResultBytes(bytes []byte) {
@@ -136,17 +157,29 @@ func (r *Router) RPCRouter(router string, handler HandlerFunc) {
 
 // group
 type Group struct {
-	app       IApp
-	groupName string
+	app         IApp
+	groupName   string
+	mapSessions map[string]*Session
+}
+
+func (g *Group) AddSession(s *Session) {
+	if s != nil {
+		g.mapSessions[s.GetCid()] = s
+	}
 }
 
 func (g *Group) BoadCast(bytes []byte) {
-
+	if len(bytes) > 0 && len(g.mapSessions) > 0 {
+		for _, value := range g.mapSessions {
+			g.app.PushMsg(value, bytes)
+		}
+	}
 }
 
 func NewGroup(app IApp, groupName string) *Group {
 	return &Group{
-		app:       app,
-		groupName: groupName,
+		app:         app,
+		groupName:   groupName,
+		mapSessions: make(map[string]*Session, 1<<9),
 	}
 }
