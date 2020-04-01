@@ -110,45 +110,49 @@ func (c *Connector) decodeClientPack(pack *ChanMsgPack) error {
 		c.ErrorToClient(pack.cid, gnError.ErrPackWrongFormat, "pack format wrong json  please check ")
 		return gnError.ErrCUnmarshalClientPack
 	}
-	router := (mapData["router"]).(string)
-	if len(router) > 0 {
-		routers := strings.Split(router, ".")
-		c.logger.Infof("connector-   router    %v \n ", routers)
-		if len(routers) > 1 {
+	if routerS, ok := mapData["router"]; ok {
+		if router, ok := routerS.(string); ok {
+			routers := strings.Split(router, ".")
+			c.logger.Infof("connector-   router    %v \n ", routers)
+			if len(routers) > 1 {
 
-			// calculate end serverAddress
-			serverAddress := c.getRouterServerId(routers[0], pack.logicBindID, pack.cid, c.config.GetServerByType(routers[0]))
-			// marshal msg to  nats   or  end server
-			if len(serverAddress) > 0 && len(routers[1]) > 0 {
-				// push
-				pack := &config.TSession{
-					Cid:          pack.cid,
-					SrcSubRouter: c.LinkerClient.GetSubRounter(),
-					DstSubRouter: serverAddress,
-					Body:         pack.body,
-					St:           config.TSession_CONNECTOR,
-					Router:       routers[1],
-					LogicBindId:  pack.logicBindID,
-				}
-				out, err := proto.Marshal(pack)
-				if err == nil {
-					c.logger.Infof("connector  send  serverAddress   %v   Msg  %v  ", serverAddress, out)
-					c.LinkerClient.SendMsg(serverAddress, out)
+				// calculate end serverAddress
+				serverAddress := c.getRouterServerId(routers[0], pack.logicBindID, pack.cid, c.config.GetServerByType(routers[0]))
+				// marshal msg to  nats   or  end server
+				if len(serverAddress) > 0 && len(routers[1]) > 0 {
+					// push
+					pack := &config.TSession{
+						Cid:          pack.cid,
+						SrcSubRouter: c.LinkerClient.GetSubRounter(),
+						DstSubRouter: serverAddress,
+						Body:         pack.body,
+						St:           config.TSession_CONNECTOR,
+						Router:       routers[1],
+						LogicBindId:  pack.logicBindID,
+					}
+					out, err := proto.Marshal(pack)
+					if err == nil {
+						c.logger.Infof("connector  send  serverAddress   %v   Msg  %v  ", serverAddress, out)
+						c.LinkerClient.SendMsg(serverAddress, out)
+					} else {
+						c.logger.Errorf("connector  send Marshal Pb  errr   %v  ", err)
+						return gnError.ErrCmarshalPbPack
+					}
 				} else {
-					c.logger.Errorf("connector  send Marshal Pb  errr   %v  ", err)
-					return gnError.ErrCmarshalPbPack
+					c.ErrorToClient(pack.cid, gnError.ErrRouter, "please check router  format")
+					c.logger.Infof("connector- recve cid  %s  msg  %v   route fail  please check route \n", pack.cid, string(pack.body))
 				}
 			} else {
+				c.logger.Infof("recve  router  error      %v   ", router)
 				c.ErrorToClient(pack.cid, gnError.ErrRouter, "please check router  format")
-				c.logger.Infof("connector- recve cid  %s  msg  %v   route fail  please check route \n", pack.cid, string(pack.body))
 			}
 		} else {
-			c.logger.Infof("recve  router  error      %v   ", router)
 			c.ErrorToClient(pack.cid, gnError.ErrRouter, "please check router  format")
 		}
 	} else {
 		c.ErrorToClient(pack.cid, gnError.ErrRouter, "please check router  format")
 	}
+
 	return nil
 }
 

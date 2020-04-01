@@ -211,7 +211,7 @@ func NewWSConnection(conn *websocket.Conn, outChan chan *ChanMsgPack, logger *gl
 		wsConn:   conn,
 		RChan:    make(chan []byte, 10),
 		WChan:    outChan,
-		cid:      uuid.New().String() + "-" + strconv.FormatUint(atomic.AddUint64(&cidAddBase, 1), 10),
+		cid:      uuid.New().String() + "-" + serverId + "-" + strconv.FormatUint(atomic.AddUint64(&cidAddBase, 1), 10),
 		logger:   logger,
 		isRuning: false,
 		exDetect: detect,
