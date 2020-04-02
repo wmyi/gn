@@ -63,6 +63,10 @@ type IApp interface {
 	GetGroup(groupName string) *Group
 	BoadCastByGroupName(groupName string, data []byte)
 
+	SetObjectByTag(tag string, obj interface{})
+	GetObjectByTag(tag string) interface{}
+	DelObjectByTag(tag string)
+
 	callRPCHandlers(pack IPack)
 	callAPIHandlers(pack IPack)
 

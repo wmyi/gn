@@ -51,6 +51,7 @@ type App struct {
 	WRoutineCan    context.CancelFunc
 	runRoutineChan chan bool
 	maxRoutineNum  int
+	tagObjs        *sync.Map
 }
 
 func ParseCommands() {
@@ -77,6 +78,7 @@ func DefaultApp(conf *config.Config) (IApp, error) {
 			rpcTimeOut:    5,
 			isRuning:      false,
 			maxRoutineNum: 1024, // defalut maxRoutine 同时
+			tagObjs:       &sync.Map{},
 		}
 		serverConfig := conf.GetServerConfByServerId(serverId)
 		// timeout
@@ -101,6 +103,26 @@ func DefaultApp(conf *config.Config) (IApp, error) {
 		instance.cmdMaster = NewAppCmd(instance.logger, instance.links, instance.exDetect)
 	})
 	return instance, nil
+}
+
+func (a *App) SetObjectByTag(tag string, obj interface{}) {
+	if len(tag) > 0 && obj != nil {
+		a.tagObjs.Store(tag, obj)
+	}
+}
+func (a *App) GetObjectByTag(tag string) interface{} {
+	if len(tag) > 0 {
+		if obj, ok := a.tagObjs.Load(tag); ok {
+			return obj
+		}
+	}
+	return nil
+}
+
+func (a *App) DelObjectByTag(tag string) {
+	if len(tag) > 0 {
+		a.tagObjs.Delete(tag)
+	}
 }
 
 func (a *App) GetLogger() *glog.Glogger {
