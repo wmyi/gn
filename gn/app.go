@@ -110,13 +110,13 @@ func (a *App) SetObjectByTag(tag string, obj interface{}) {
 		a.tagObjs.Store(tag, obj)
 	}
 }
-func (a *App) GetObjectByTag(tag string) interface{} {
+func (a *App) GetObjectByTag(tag string) (interface{}, bool) {
 	if len(tag) > 0 {
 		if obj, ok := a.tagObjs.Load(tag); ok {
-			return obj
+			return obj, ok
 		}
 	}
-	return nil
+	return nil, false
 }
 
 func (a *App) DelObjectByTag(tag string) {
@@ -410,6 +410,7 @@ func (a *App) callRPCHandlers(pack IPack) {
 						Body:         pack.GetResults(),
 						St:           config.TSession_LOGIC,
 						ReplyToken:   pack.GetReplyToken(),
+						RpcRespCode:  pack.GetRPCRespCode(),
 					}
 					if a.outChan != nil {
 						a.outChan <- replyPack

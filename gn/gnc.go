@@ -117,6 +117,13 @@ func (p *Pack) GetBindId() string {
 	return p.session.GetBindId()
 }
 
+func (p *Pack) SetRPCRespCode(code int) {
+	p.ts.RpcRespCode = int32(code)
+}
+func (p *Pack) GetRPCRespCode() int32 {
+	return p.ts.RpcRespCode
+}
+
 // session
 
 func NewSession(cid, scrNodeId, bindId string) *Session {

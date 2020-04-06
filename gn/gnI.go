@@ -43,6 +43,8 @@ type IPack interface {
 	GetSrcSubRouter() string
 	GetLogger() *glog.Glogger
 	GetBindId() string
+	SetRPCRespCode(code int)
+	GetRPCRespCode() int32
 }
 
 // IApp
@@ -65,7 +67,7 @@ type IApp interface {
 	BoadCastByGroupName(groupName string, data []byte)
 
 	SetObjectByTag(tag string, obj interface{})
-	GetObjectByTag(tag string) interface{}
+	GetObjectByTag(tag string) (interface{}, bool)
 	DelObjectByTag(tag string)
 
 	callRPCHandlers(pack IPack)
