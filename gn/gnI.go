@@ -34,6 +34,7 @@ type IPack interface {
 	GetSession() *Session
 	GetRouter() string
 	ResultJson(obj interface{})
+	ExceptionAbortJson(code, msg string)
 	ResultProtoBuf(obj interface{})
 	ResultBytes(bytes []byte)
 	GetResults() []byte

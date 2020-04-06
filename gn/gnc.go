@@ -4,6 +4,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/wmyi/gn/config"
 	"github.com/wmyi/gn/glog"
+	"github.com/wmyi/gn/gnError"
 )
 
 // pack
@@ -54,6 +55,7 @@ func (p *Pack) GetSession() *Session {
 func (p *Pack) GetRouter() string {
 	return p.ts.GetRouter()
 }
+
 func (p *Pack) ResultJson(obj interface{}) {
 	if obj != nil {
 		out, err := jsonI.Marshal(obj)
@@ -64,6 +66,17 @@ func (p *Pack) ResultJson(obj interface{}) {
 		p.resultbytes = out
 	}
 }
+
+func (p *Pack) ExceptionAbortJson(code, msg string) {
+	if len(code) > 0 && len(msg) > 0 {
+		p.ResultJson(gnError.PackError{
+			Code:     code,
+			ErrorMsg: msg,
+		})
+		p.Abort()
+	}
+}
+
 func (p *Pack) ResultProtoBuf(obj interface{}) {
 	if obj != nil {
 		pbObj, ok := obj.(proto.Message)
