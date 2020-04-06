@@ -525,7 +525,7 @@ func (a *App) APIRouter(router string, handlers ...HandlerFunc) {
 	if a.apiRouters != nil {
 		a.apiRouterMutex.Lock()
 		if a.apiRouters[router] == nil {
-			a.apiRouters[router] = make([]HandlerFunc, 0, 10)
+			a.apiRouters[router] = make([]HandlerFunc, 0, 1<<8)
 		}
 		a.apiRouters[router] = append(a.apiRouters[router], handlers...)
 		a.apiRouterMutex.Unlock()
@@ -535,7 +535,7 @@ func (a *App) RPCRouter(router string, handlers HandlerFunc) {
 	if a.rpcRouters != nil {
 		a.rpcHandleMutex.Lock()
 		if a.rpcRouters[router] == nil {
-			a.rpcRouters[router] = make([]HandlerFunc, 0, 10)
+			a.rpcRouters[router] = make([]HandlerFunc, 0, 1<<8)
 		}
 		a.rpcRouters[router] = append(a.rpcRouters[router], handlers)
 		a.rpcHandleMutex.Unlock()

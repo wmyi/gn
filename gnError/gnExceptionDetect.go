@@ -22,7 +22,7 @@ func NewGnExceptionDetect(log *glog.Glogger) *GnExceptionDetect {
 		isRuning:          false,
 		exceptionChan:     make(chan *GnException, 1<<9),
 		logger:            log,
-		exceptionHandlers: make([]ExceptionHandleFunc, 1<<5),
+		exceptionHandlers: make([]ExceptionHandleFunc, 0, 1<<5),
 	}
 }
 
