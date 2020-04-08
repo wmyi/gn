@@ -50,6 +50,8 @@ type IPack interface {
 // IApp
 type IApp interface {
 	PushMsg(session *Session, data []byte)
+	PushJsonMsg(session *Session, obj interface{})
+	PushProtoBufMsg(session *Session, obj interface{})
 	SendRPCMsg(serverId string, handlerName string, data []byte) (IPack, error)
 
 	APIRouter(router string, handlers ...HandlerFunc)
@@ -65,6 +67,7 @@ type IApp interface {
 	NewGroup(groupName string) *Group
 	GetGroup(groupName string) (*Group, bool)
 	BoadCastByGroupName(groupName string, data []byte)
+	DelGroup(groupName string)
 
 	SetObjectByTag(tag string, obj interface{})
 	GetObjectByTag(tag string) (interface{}, bool)

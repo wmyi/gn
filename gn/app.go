@@ -13,6 +13,7 @@ import (
 	"github.com/wmyi/gn/config"
 	"github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
+	"github.com/wmyi/gn/gnutil"
 	"github.com/wmyi/gn/linker"
 
 	"github.com/golang/protobuf/proto"
@@ -34,7 +35,7 @@ type App struct {
 	apiRouters     map[string][]HandlerFunc
 	rpcRouters     map[string][]HandlerFunc
 	links          linker.ILinker
-	groups         map[string]*Group
+	groups         *sync.Map
 	outChan        chan *config.TSession
 	inChan         chan []byte
 	rpcRespMap     map[string]chan IPack
@@ -78,7 +79,7 @@ func DefaultApp(conf *config.Config) (IApp, error) {
 			rpcTimeOut:    5,
 			isRuning:      false,
 			maxRoutineNum: 1024, // defalut maxRoutine 同时
-			tagObjs:       &sync.Map{},
+			tagObjs:       new(sync.Map),
 		}
 		serverConfig := conf.GetServerConfByServerId(serverId)
 		// timeout
@@ -199,6 +200,26 @@ func (a *App) PushMsg(session *Session, data []byte) {
 		}
 	}
 }
+
+func (a *App) PushJsonMsg(session *Session, obj interface{}) {
+	if session != nil && obj != nil {
+		out, ok := gnutil.JsonToBytes(obj, a.logger)
+		if ok && out != nil {
+			a.PushMsg(session, out)
+		}
+	}
+
+}
+func (a *App) PushProtoBufMsg(session *Session, obj interface{}) {
+	if session != nil && obj != nil {
+		out, ok := gnutil.ProtoBufToBytes(obj, a.logger)
+		if ok && out != nil {
+			a.PushMsg(session, out)
+		}
+	}
+
+}
+
 func (a *App) SendRPCMsg(serverId string, handlerName string, data []byte) (IPack, error) {
 	if len(serverId) > 0 && len(handlerName) > 0 && len(data) > 0 {
 		token := serverId + "-" + strconv.FormatUint(atomic.AddUint64(&ReTokenBase, 1), 10)
@@ -552,20 +573,33 @@ func (a *App) NewRouter() IRouter {
 }
 
 func (a *App) NewGroup(groupName string) *Group {
-	var group = NewGroup(a, groupName)
-	if a.groups == nil {
-		a.groups = make(map[string]*Group)
+	if len(groupName) > 0 {
+		var group = NewGroup(a, groupName)
+		if a.groups == nil {
+			a.groups = new(sync.Map)
+		}
+		a.groups.Store(groupName, group)
+		return group
 	}
-	a.groups[groupName] = group
-	return group
+	return nil
+
 }
 
 func (a *App) GetGroup(groupName string) (*Group, bool) {
-	if a.groups != nil {
-		group, ok := a.groups[groupName]
-		return group, ok
+	if len(groupName) > 0 && a.groups != nil {
+		if group, ok := a.groups.Load(groupName); ok && group != nil {
+			if g, ok := group.(*Group); ok && g != nil {
+				return g, ok
+			}
+		}
 	}
 	return nil, false
+}
+
+func (a *App) DelGroup(groupName string) {
+	if len(groupName) > 0 && a.groups != nil {
+		a.groups.Delete(groupName)
+	}
 }
 
 func (a *App) AddExceptionHandler(handler gnError.ExceptionHandleFunc) {

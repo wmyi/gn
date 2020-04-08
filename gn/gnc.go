@@ -1,10 +1,12 @@
 package gn
 
 import (
-	"github.com/golang/protobuf/proto"
+	"sync"
+
 	"github.com/wmyi/gn/config"
 	"github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
+	"github.com/wmyi/gn/gnutil"
 )
 
 // pack
@@ -57,12 +59,8 @@ func (p *Pack) GetRouter() string {
 }
 
 func (p *Pack) ResultJson(obj interface{}) {
-	if obj != nil {
-		out, err := jsonI.Marshal(obj)
-		if err != nil {
-			p.app.GetLogger().Errorf("Pack  ResultJson  jsonI.Marshal  err  ", err)
-			return
-		}
+	out, ok := gnutil.JsonToBytes(obj, p.app.GetLogger())
+	if ok && out != nil {
 		p.resultbytes = out
 	}
 }
@@ -78,20 +76,11 @@ func (p *Pack) ExceptionAbortJson(code, msg string) {
 }
 
 func (p *Pack) ResultProtoBuf(obj interface{}) {
-	if obj != nil {
-		pbObj, ok := obj.(proto.Message)
-		if !ok {
-			p.app.GetLogger().Errorf("Pack  ResultProtoBuf  obj is no proto.Message  type    ")
-			return
-		}
-		out, err := proto.Marshal(pbObj)
-		if err != nil {
-			p.app.GetLogger().Errorf("Pack  ResultJson  proto.Buffer.Marshal  err     ", err)
-			return
-		}
+
+	out, ok := gnutil.ProtoBufToBytes(obj, p.app.GetLogger())
+	if ok && out != nil {
 		p.resultbytes = out
 	}
-
 }
 func (p *Pack) ResultBytes(bytes []byte) {
 	if len(bytes) > 0 {
@@ -179,54 +168,54 @@ func (r *Router) RPCRouter(router string, handler HandlerFunc) {
 type Group struct {
 	app         IApp
 	groupName   string
-	mapSessions map[string]*Session
+	mapSessions *sync.Map
 }
 
 func (g *Group) AddSession(key string, s *Session) {
 	if s != nil && len(key) > 0 {
-		g.mapSessions[key] = s
+		g.mapSessions.Store(key, s)
+	}
+}
+
+func (g *Group) DelSession(key string) {
+	if len(key) > 0 {
+		g.mapSessions.Delete(key)
 	}
 }
 
 func (g *Group) GetSession(key string) (*Session, bool) {
 	if len(key) > 0 {
-		s, ok := g.mapSessions[key]
-		return s, ok
+		if s, ok := g.mapSessions.Load(key); ok {
+			if ss, ok := s.(*Session); ok {
+				return ss, ok
+			}
+		}
 	}
 	return nil, false
 }
 
 func (g *Group) BroadCast(bytes []byte) {
-	if len(bytes) > 0 && len(g.mapSessions) > 0 {
-		for _, value := range g.mapSessions {
-			g.app.PushMsg(value, bytes)
-		}
+
+	if len(bytes) > 0 {
+		g.mapSessions.Range(func(key, value interface{}) bool {
+			if s, ok := value.(*Session); ok && s != nil {
+				g.app.PushMsg(s, bytes)
+			}
+			return true
+		})
 	}
 }
 
 func (g *Group) BroadCastJson(obj interface{}) {
-	if obj != nil && len(g.mapSessions) > 0 {
-		out, err := jsonI.Marshal(obj)
-		if err != nil {
-			g.app.GetLogger().Errorf("Pack  ResultJson  jsonI.Marshal  err  ", err)
-			return
-		}
+	out, ok := gnutil.JsonToBytes(obj, g.app.GetLogger())
+	if ok && out != nil {
 		g.BroadCast(out)
 	}
 }
 
 func (g *Group) BroadCastProtoBuf(obj interface{}) {
-	if obj != nil && len(g.mapSessions) > 0 {
-		pbObj, ok := obj.(proto.Message)
-		if !ok {
-			g.app.GetLogger().Errorf("Pack  ResultProtoBuf  obj is no proto.Message  type    ")
-			return
-		}
-		out, err := proto.Marshal(pbObj)
-		if err != nil {
-			g.app.GetLogger().Errorf("Pack  ResultJson  proto.Buffer.Marshal  err     ", err)
-			return
-		}
+	out, ok := gnutil.ProtoBufToBytes(obj, g.app.GetLogger())
+	if ok && out != nil {
 		g.BroadCast(out)
 	}
 
@@ -236,6 +225,6 @@ func NewGroup(app IApp, groupName string) *Group {
 	return &Group{
 		app:         app,
 		groupName:   groupName,
-		mapSessions: make(map[string]*Session, 1<<9),
+		mapSessions: new(sync.Map),
 	}
 }
