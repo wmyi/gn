@@ -81,5 +81,4 @@ type IApp interface {
 	AddExceptionHandler(handler gnError.ExceptionHandleFunc)
 	GetLinker() linker.ILinker
 	GetRunRoutineNum() int
-	GetLoger() *glog.Glogger
 }

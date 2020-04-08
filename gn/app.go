@@ -576,7 +576,3 @@ func (a *App) AddExceptionHandler(handler gnError.ExceptionHandleFunc) {
 func (a *App) GetLinker() linker.ILinker {
 	return a.links
 }
-
-func (a *App) GetLoger() *glog.Glogger {
-	return a.logger
-}

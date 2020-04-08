@@ -60,7 +60,7 @@ func (p *Pack) ResultJson(obj interface{}) {
 	if obj != nil {
 		out, err := jsonI.Marshal(obj)
 		if err != nil {
-			p.app.GetLoger().Errorf("Pack  ResultJson  jsonI.Marshal  err  ", err)
+			p.app.GetLogger().Errorf("Pack  ResultJson  jsonI.Marshal  err  ", err)
 			return
 		}
 		p.resultbytes = out
@@ -81,12 +81,12 @@ func (p *Pack) ResultProtoBuf(obj interface{}) {
 	if obj != nil {
 		pbObj, ok := obj.(proto.Message)
 		if !ok {
-			p.app.GetLoger().Errorf("Pack  ResultProtoBuf  obj is no proto.Message  type    ")
+			p.app.GetLogger().Errorf("Pack  ResultProtoBuf  obj is no proto.Message  type    ")
 			return
 		}
 		out, err := proto.Marshal(pbObj)
 		if err != nil {
-			p.app.GetLoger().Errorf("Pack  ResultJson  proto.Buffer.Marshal  err     ", err)
+			p.app.GetLogger().Errorf("Pack  ResultJson  proto.Buffer.Marshal  err     ", err)
 			return
 		}
 		p.resultbytes = out
@@ -111,7 +111,7 @@ func (p *Pack) GetSrcSubRouter() string {
 	return p.ts.GetSrcSubRouter()
 }
 func (p *Pack) GetLogger() *glog.Glogger {
-	return p.app.GetLoger()
+	return p.app.GetLogger()
 }
 func (p *Pack) GetBindId() string {
 	return p.session.GetBindId()
