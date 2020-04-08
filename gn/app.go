@@ -178,9 +178,9 @@ func (a *App) GetServerConfig() *config.Config {
 }
 
 func (a *App) BoadCastByGroupName(groupName string, data []byte) {
-	group := a.GetGroup(groupName)
-	if group != nil {
-		group.BoadCast(data)
+	group, ok := a.GetGroup(groupName)
+	if ok && group != nil {
+		group.BroadCast(data)
 	}
 }
 
@@ -560,11 +560,12 @@ func (a *App) NewGroup(groupName string) *Group {
 	return group
 }
 
-func (a *App) GetGroup(groupName string) *Group {
+func (a *App) GetGroup(groupName string) (*Group, bool) {
 	if a.groups != nil {
-		return a.groups[groupName]
+		group, ok := a.groups[groupName]
+		return group, ok
 	}
-	return nil
+	return nil, false
 }
 
 func (a *App) AddExceptionHandler(handler gnError.ExceptionHandleFunc) {

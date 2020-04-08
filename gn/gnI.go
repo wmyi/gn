@@ -63,7 +63,7 @@ type IApp interface {
 	GetRPCRounterLock() *sync.RWMutex
 
 	NewGroup(groupName string) *Group
-	GetGroup(groupName string) *Group
+	GetGroup(groupName string) (*Group, bool)
 	BoadCastByGroupName(groupName string, data []byte)
 
 	SetObjectByTag(tag string, obj interface{})

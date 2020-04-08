@@ -182,18 +182,54 @@ type Group struct {
 	mapSessions map[string]*Session
 }
 
-func (g *Group) AddSession(s *Session) {
-	if s != nil {
-		g.mapSessions[s.GetCid()] = s
+func (g *Group) AddSession(key string, s *Session) {
+	if s != nil && len(key) > 0 {
+		g.mapSessions[key] = s
 	}
 }
 
-func (g *Group) BoadCast(bytes []byte) {
+func (g *Group) GetSession(key string) (*Session, bool) {
+	if len(key) > 0 {
+		s, ok := g.mapSessions[key]
+		return s, ok
+	}
+	return nil, false
+}
+
+func (g *Group) BroadCast(bytes []byte) {
 	if len(bytes) > 0 && len(g.mapSessions) > 0 {
 		for _, value := range g.mapSessions {
 			g.app.PushMsg(value, bytes)
 		}
 	}
+}
+
+func (g *Group) BroadCastJson(obj interface{}) {
+	if obj != nil && len(g.mapSessions) > 0 {
+		out, err := jsonI.Marshal(obj)
+		if err != nil {
+			g.app.GetLogger().Errorf("Pack  ResultJson  jsonI.Marshal  err  ", err)
+			return
+		}
+		g.BroadCast(out)
+	}
+}
+
+func (g *Group) BroadCastProtoBuf(obj interface{}) {
+	if obj != nil && len(g.mapSessions) > 0 {
+		pbObj, ok := obj.(proto.Message)
+		if !ok {
+			g.app.GetLogger().Errorf("Pack  ResultProtoBuf  obj is no proto.Message  type    ")
+			return
+		}
+		out, err := proto.Marshal(pbObj)
+		if err != nil {
+			g.app.GetLogger().Errorf("Pack  ResultJson  proto.Buffer.Marshal  err     ", err)
+			return
+		}
+		g.BroadCast(out)
+	}
+
 }
 
 func NewGroup(app IApp, groupName string) *Group {
