@@ -53,7 +53,8 @@ type IApp interface {
 	PushJsonMsg(session *Session, obj interface{})
 	PushProtoBufMsg(session *Session, obj interface{})
 	SendRPCMsg(serverId string, handlerName string, data []byte) (IPack, error)
-
+	SendRPCJsonMsg(serverId string, handlerName string, obj interface{}) (IPack, error)
+	SendRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) (IPack, error)
 	APIRouter(router string, handlers ...HandlerFunc)
 	RPCRouter(router string, handler HandlerFunc)
 

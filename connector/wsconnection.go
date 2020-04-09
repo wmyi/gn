@@ -78,16 +78,16 @@ func (wc *WSConnection) ReadMsg(ctx context.Context) {
 			break
 		}
 		msgType, message, err := wc.wsConn.ReadMessage()
-		if msgType == websocket.BinaryMessage {
-
-		}
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				wc.logger.Errorf("ws  soeckt Read err- ", err)
 			}
+			wc.logger.Errorf("ws  soeckt Read err-   %v", err)
 			break
 		}
-		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+		if msgType == websocket.TextMessage {
+			message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+		}
 		if wc.WChan != nil {
 			wc.WChan <- &ChanMsgPack{
 				cid:         wc.cid,

@@ -263,6 +263,22 @@ func (a *App) SendRPCMsg(serverId string, handlerName string, data []byte) (IPac
 	}
 }
 
+func (a *App) SendRPCJsonMsg(serverId string, handlerName string, obj interface{}) (IPack, error) {
+	out, ok := gnutil.JsonToBytes(obj, a.logger)
+	if ok {
+		return a.SendRPCMsg(serverId, handlerName, out)
+	}
+	return nil, gnError.ErrRPCParameter
+}
+func (a *App) SendRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) (IPack, error) {
+	out, ok := gnutil.ProtoBufToBytes(obj, a.logger)
+	if ok {
+		return a.SendRPCMsg(serverId, handlerName, out)
+	}
+
+	return nil, gnError.ErrRPCParameter
+}
+
 func (a *App) loopWriteChanMsg(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {

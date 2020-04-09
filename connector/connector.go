@@ -325,7 +325,7 @@ func (c *Connector) ListenAndRun() error {
 func (c *Connector) ExceptionHandler(exception *gnError.GnException) {
 	if exception.Exception == gnError.WS_CLOSED {
 		if ws, ok := c.cms.Load(exception.Id); ok && ws != nil {
-			wsCon, ok := ws.(WSConnection)
+			wsCon, ok := ws.(*WSConnection)
 			if ok {
 				wsCon.Done()
 			}
