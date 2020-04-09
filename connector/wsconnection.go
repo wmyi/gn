@@ -169,6 +169,7 @@ func (wc *WSConnection) CloseHandler(code int, text string) error {
 		Exception: gnError.WS_CLOSED,
 		Msg:       text,
 		Code:      code,
+		BindId:    wc.bindId,
 	})
 	return nil
 }

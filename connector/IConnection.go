@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 
+	"github.com/wmyi/gn/config"
 	"github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 	"github.com/wmyi/gn/linker"
@@ -37,6 +38,8 @@ type IConnector interface {
 	ListenAndRun() error
 	GetLinker() linker.ILinker
 	GetLoger() *glog.Glogger
+	SendPack(serverAddress, router, bindId, cid string, data []byte)
+	GetServerIdByRouter(serverType string, LogicBindId string, cid string, serverList []*config.ServersConfig) string
 }
 
 // 用户 接收消息   封装  channel 传输用

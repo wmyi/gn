@@ -64,6 +64,7 @@ type GnException struct {
 	Exception ExceptionType
 	Msg       string
 	Code      int
+	BindId    string
 }
 
 type PackError struct {

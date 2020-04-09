@@ -98,6 +98,28 @@ func (c *Connector) SetVerifyConnectHandler(handler VerifyClientConnectHFunc) {
 	}
 }
 
+func (c *Connector) SendPack(serverAddress, router, bindId, cid string, data []byte) {
+	if len(serverAddress) > 0 && len(router) > 0 && len(bindId) > 0 {
+		pack := &config.TSession{
+			Cid:          cid,
+			SrcSubRouter: c.LinkerClient.GetSubRounter(),
+			DstSubRouter: serverAddress,
+			Body:         data,
+			St:           config.TSession_CONNECTOR,
+			Router:       router,
+			LogicBindId:  bindId,
+		}
+		out, err := proto.Marshal(pack)
+		if err == nil {
+			c.logger.Infof("connector  SendPack  serverAddress   %v   Msg  %v  ", serverAddress, out)
+			c.LinkerClient.SendMsg(serverAddress, out)
+		} else {
+			c.logger.Errorf("connector  SendPack Marshal Pb  errr   %v  ", err)
+		}
+	}
+
+}
+
 func (c *Connector) decodeClientPack(pack *ChanMsgPack) error {
 
 	c.logger.Infof("connector- client Pack bindId  %s   receive   %v  ", pack.logicBindID, string(pack.body))
@@ -117,7 +139,7 @@ func (c *Connector) decodeClientPack(pack *ChanMsgPack) error {
 			if len(routers) > 1 {
 
 				// calculate end serverAddress
-				serverAddress := c.getRouterServerId(routers[0], pack.logicBindID, pack.cid, c.config.GetServerByType(routers[0]))
+				serverAddress := c.GetServerIdByRouter(routers[0], pack.logicBindID, pack.cid, c.config.GetServerByType(routers[0]))
 				// marshal msg to  nats   or  end server
 				if len(serverAddress) > 0 && len(routers[1]) > 0 {
 					// push
@@ -200,7 +222,7 @@ func (c *Connector) ErrorToClient(cid string, code string, errorMsg string) {
 	}
 }
 
-func (c *Connector) getRouterServerId(serverType string, LogicBindId string, cid string, serverList []*config.ServersConfig) string {
+func (c *Connector) GetServerIdByRouter(serverType string, LogicBindId string, cid string, serverList []*config.ServersConfig) string {
 	if len(LogicBindId) > 0 && len(c.rearEndHandles) > 0 {
 		handler := c.rearEndHandles[serverType]
 		if handler != nil {
