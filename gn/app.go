@@ -221,7 +221,7 @@ func (a *App) PushProtoBufMsg(session *Session, obj interface{}) {
 }
 
 func (a *App) SendRPCMsg(serverId string, handlerName string, data []byte) (IPack, error) {
-	if len(serverId) > 0 && len(handlerName) > 0 && len(data) > 0 {
+	if len(serverId) > 0 && len(handlerName) > 0 {
 		token := serverId + "-" + strconv.FormatUint(atomic.AddUint64(&ReTokenBase, 1), 10)
 		msgChan := make(chan IPack, 1)
 		a.rpcHandleMutex.Lock()
@@ -423,7 +423,7 @@ func (a *App) callRPCHandlers(pack IPack) {
 					}
 				}
 
-				if pack.GetResults() != nil && len(pack.GetResults()) > 0 {
+				if len(pack.GetSrcSubRouter()) > 0 {
 					replyPack := &config.TSession{
 						Cid:          pack.GetSession().GetCid(),
 						SrcSubRouter: pack.GetDstSubRouter(),
