@@ -34,6 +34,7 @@ type IPack interface {
 	GetSession() *Session
 	GetRouter() string
 	ResultJson(obj interface{})
+	ExceptionAbortJson(code, msg string)
 	ResultProtoBuf(obj interface{})
 	ResultBytes(bytes []byte)
 	GetResults() []byte
@@ -42,13 +43,18 @@ type IPack interface {
 	GetSrcSubRouter() string
 	GetLogger() *glog.Glogger
 	GetBindId() string
+	SetRPCRespCode(code int)
+	GetRPCRespCode() int32
 }
 
 // IApp
 type IApp interface {
 	PushMsg(session *Session, data []byte)
+	PushJsonMsg(session *Session, obj interface{})
+	PushProtoBufMsg(session *Session, obj interface{})
 	SendRPCMsg(serverId string, handlerName string, data []byte) (IPack, error)
-
+	SendRPCJsonMsg(serverId string, handlerName string, obj interface{}) (IPack, error)
+	SendRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) (IPack, error)
 	APIRouter(router string, handlers ...HandlerFunc)
 	RPCRouter(router string, handler HandlerFunc)
 
@@ -60,8 +66,13 @@ type IApp interface {
 	GetRPCRounterLock() *sync.RWMutex
 
 	NewGroup(groupName string) *Group
-	GetGroup(groupName string) *Group
+	GetGroup(groupName string) (*Group, bool)
 	BoadCastByGroupName(groupName string, data []byte)
+	DelGroup(groupName string)
+
+	SetObjectByTag(tag string, obj interface{})
+	GetObjectByTag(tag string) (interface{}, bool)
+	DelObjectByTag(tag string)
 
 	callRPCHandlers(pack IPack)
 	callAPIHandlers(pack IPack)
@@ -74,5 +85,4 @@ type IApp interface {
 	AddExceptionHandler(handler gnError.ExceptionHandleFunc)
 	GetLinker() linker.ILinker
 	GetRunRoutineNum() int
-	GetLoger() *glog.Glogger
 }

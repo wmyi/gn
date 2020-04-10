@@ -13,6 +13,7 @@ import (
 	"github.com/wmyi/gn/config"
 	"github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
+	"github.com/wmyi/gn/gnutil"
 	"github.com/wmyi/gn/linker"
 
 	"github.com/golang/protobuf/proto"
@@ -34,7 +35,7 @@ type App struct {
 	apiRouters     map[string][]HandlerFunc
 	rpcRouters     map[string][]HandlerFunc
 	links          linker.ILinker
-	groups         map[string]*Group
+	groups         *sync.Map
 	outChan        chan *config.TSession
 	inChan         chan []byte
 	rpcRespMap     map[string]chan IPack
@@ -51,6 +52,7 @@ type App struct {
 	WRoutineCan    context.CancelFunc
 	runRoutineChan chan bool
 	maxRoutineNum  int
+	tagObjs        *sync.Map
 }
 
 func ParseCommands() {
@@ -77,6 +79,7 @@ func DefaultApp(conf *config.Config) (IApp, error) {
 			rpcTimeOut:    5,
 			isRuning:      false,
 			maxRoutineNum: 1024, // defalut maxRoutine 同时
+			tagObjs:       new(sync.Map),
 		}
 		serverConfig := conf.GetServerConfByServerId(serverId)
 		// timeout
@@ -101,6 +104,26 @@ func DefaultApp(conf *config.Config) (IApp, error) {
 		instance.cmdMaster = NewAppCmd(instance.logger, instance.links, instance.exDetect)
 	})
 	return instance, nil
+}
+
+func (a *App) SetObjectByTag(tag string, obj interface{}) {
+	if len(tag) > 0 && obj != nil {
+		a.tagObjs.Store(tag, obj)
+	}
+}
+func (a *App) GetObjectByTag(tag string) (interface{}, bool) {
+	if len(tag) > 0 {
+		if obj, ok := a.tagObjs.Load(tag); ok {
+			return obj, ok
+		}
+	}
+	return nil, false
+}
+
+func (a *App) DelObjectByTag(tag string) {
+	if len(tag) > 0 {
+		a.tagObjs.Delete(tag)
+	}
 }
 
 func (a *App) GetLogger() *glog.Glogger {
@@ -156,9 +179,9 @@ func (a *App) GetServerConfig() *config.Config {
 }
 
 func (a *App) BoadCastByGroupName(groupName string, data []byte) {
-	group := a.GetGroup(groupName)
-	if group != nil {
-		group.BoadCast(data)
+	group, ok := a.GetGroup(groupName)
+	if ok && group != nil {
+		group.BroadCast(data)
 	}
 }
 
@@ -177,8 +200,28 @@ func (a *App) PushMsg(session *Session, data []byte) {
 		}
 	}
 }
+
+func (a *App) PushJsonMsg(session *Session, obj interface{}) {
+	if session != nil && obj != nil {
+		out, ok := gnutil.JsonToBytes(obj, a.logger)
+		if ok && out != nil {
+			a.PushMsg(session, out)
+		}
+	}
+
+}
+func (a *App) PushProtoBufMsg(session *Session, obj interface{}) {
+	if session != nil && obj != nil {
+		out, ok := gnutil.ProtoBufToBytes(obj, a.logger)
+		if ok && out != nil {
+			a.PushMsg(session, out)
+		}
+	}
+
+}
+
 func (a *App) SendRPCMsg(serverId string, handlerName string, data []byte) (IPack, error) {
-	if len(serverId) > 0 && len(handlerName) > 0 && len(data) > 0 {
+	if len(serverId) > 0 && len(handlerName) > 0 {
 		token := serverId + "-" + strconv.FormatUint(atomic.AddUint64(&ReTokenBase, 1), 10)
 		msgChan := make(chan IPack, 1)
 		a.rpcHandleMutex.Lock()
@@ -218,6 +261,22 @@ func (a *App) SendRPCMsg(serverId string, handlerName string, data []byte) (IPac
 	} else {
 		return nil, gnError.ErrRPCParameter
 	}
+}
+
+func (a *App) SendRPCJsonMsg(serverId string, handlerName string, obj interface{}) (IPack, error) {
+	out, ok := gnutil.JsonToBytes(obj, a.logger)
+	if ok {
+		return a.SendRPCMsg(serverId, handlerName, out)
+	}
+	return nil, gnError.ErrRPCParameter
+}
+func (a *App) SendRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) (IPack, error) {
+	out, ok := gnutil.ProtoBufToBytes(obj, a.logger)
+	if ok {
+		return a.SendRPCMsg(serverId, handlerName, out)
+	}
+
+	return nil, gnError.ErrRPCParameter
 }
 
 func (a *App) loopWriteChanMsg(ctx context.Context) {
@@ -380,7 +439,7 @@ func (a *App) callRPCHandlers(pack IPack) {
 					}
 				}
 
-				if pack.GetResults() != nil && len(pack.GetResults()) > 0 {
+				if len(pack.GetSrcSubRouter()) > 0 {
 					replyPack := &config.TSession{
 						Cid:          pack.GetSession().GetCid(),
 						SrcSubRouter: pack.GetDstSubRouter(),
@@ -388,6 +447,7 @@ func (a *App) callRPCHandlers(pack IPack) {
 						Body:         pack.GetResults(),
 						St:           config.TSession_LOGIC,
 						ReplyToken:   pack.GetReplyToken(),
+						RpcRespCode:  pack.GetRPCRespCode(),
 					}
 					if a.outChan != nil {
 						a.outChan <- replyPack
@@ -503,7 +563,7 @@ func (a *App) APIRouter(router string, handlers ...HandlerFunc) {
 	if a.apiRouters != nil {
 		a.apiRouterMutex.Lock()
 		if a.apiRouters[router] == nil {
-			a.apiRouters[router] = make([]HandlerFunc, 0, 10)
+			a.apiRouters[router] = make([]HandlerFunc, 0, 1<<8)
 		}
 		a.apiRouters[router] = append(a.apiRouters[router], handlers...)
 		a.apiRouterMutex.Unlock()
@@ -513,7 +573,7 @@ func (a *App) RPCRouter(router string, handlers HandlerFunc) {
 	if a.rpcRouters != nil {
 		a.rpcHandleMutex.Lock()
 		if a.rpcRouters[router] == nil {
-			a.rpcRouters[router] = make([]HandlerFunc, 0, 10)
+			a.rpcRouters[router] = make([]HandlerFunc, 0, 1<<8)
 		}
 		a.rpcRouters[router] = append(a.rpcRouters[router], handlers)
 		a.rpcHandleMutex.Unlock()
@@ -529,19 +589,33 @@ func (a *App) NewRouter() IRouter {
 }
 
 func (a *App) NewGroup(groupName string) *Group {
-	var group = NewGroup(a, groupName)
-	if a.groups == nil {
-		a.groups = make(map[string]*Group)
-	}
-	a.groups[groupName] = group
-	return group
-}
-
-func (a *App) GetGroup(groupName string) *Group {
-	if a.groups != nil {
-		return a.groups[groupName]
+	if len(groupName) > 0 {
+		var group = NewGroup(a, groupName)
+		if a.groups == nil {
+			a.groups = new(sync.Map)
+		}
+		a.groups.Store(groupName, group)
+		return group
 	}
 	return nil
+
+}
+
+func (a *App) GetGroup(groupName string) (*Group, bool) {
+	if len(groupName) > 0 && a.groups != nil {
+		if group, ok := a.groups.Load(groupName); ok && group != nil {
+			if g, ok := group.(*Group); ok && g != nil {
+				return g, ok
+			}
+		}
+	}
+	return nil, false
+}
+
+func (a *App) DelGroup(groupName string) {
+	if len(groupName) > 0 && a.groups != nil {
+		a.groups.Delete(groupName)
+	}
 }
 
 func (a *App) AddExceptionHandler(handler gnError.ExceptionHandleFunc) {
@@ -552,8 +626,4 @@ func (a *App) AddExceptionHandler(handler gnError.ExceptionHandleFunc) {
 
 func (a *App) GetLinker() linker.ILinker {
 	return a.links
-}
-
-func (a *App) GetLoger() *glog.Glogger {
-	return a.logger
 }

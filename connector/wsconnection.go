@@ -78,16 +78,16 @@ func (wc *WSConnection) ReadMsg(ctx context.Context) {
 			break
 		}
 		msgType, message, err := wc.wsConn.ReadMessage()
-		if msgType == websocket.BinaryMessage {
-
-		}
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				wc.logger.Errorf("ws  soeckt Read err- ", err)
 			}
+			wc.logger.Errorf("ws  soeckt Read err-   %v", err)
 			break
 		}
-		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+		if msgType == websocket.TextMessage {
+			message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+		}
 		if wc.WChan != nil {
 			wc.WChan <- &ChanMsgPack{
 				cid:         wc.cid,
@@ -169,6 +169,7 @@ func (wc *WSConnection) CloseHandler(code int, text string) error {
 		Exception: gnError.WS_CLOSED,
 		Msg:       text,
 		Code:      code,
+		BindId:    wc.bindId,
 	})
 	return nil
 }
@@ -211,7 +212,7 @@ func NewWSConnection(conn *websocket.Conn, outChan chan *ChanMsgPack, logger *gl
 		wsConn:   conn,
 		RChan:    make(chan []byte, 10),
 		WChan:    outChan,
-		cid:      uuid.New().String() + "-" + strconv.FormatUint(atomic.AddUint64(&cidAddBase, 1), 10),
+		cid:      uuid.New().String() + "-" + serverId + "-" + strconv.FormatUint(atomic.AddUint64(&cidAddBase, 1), 10),
 		logger:   logger,
 		isRuning: false,
 		exDetect: detect,

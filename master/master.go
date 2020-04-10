@@ -306,7 +306,7 @@ func (m *Master) TimeOutServerListListener(tHandler TimeOutHandlerFunc) {
 
 func (m *Master) checkNodeTimeOut() {
 	now := time.Now().UnixNano()
-	nodeSlices := make([]NodeInfo, 1<<1)
+	nodeSlices := make([]NodeInfo, 0)
 	for ID, info := range m.serverMap {
 		// now - last pong time  > heartBeartTime
 		if time.Duration(now-info.CurrenTime).Seconds() > float64(m.config.MasterConf.NodeHeartBeart) {

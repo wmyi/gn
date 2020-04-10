@@ -16,7 +16,8 @@ message TSession {
   sessionType  st  =5;
   string replyToken = 6;
   string router =7;
- string logicBindId = 8; 
+  string logicBindId = 8; 
+  int32 rpcRespCode = 9;
 }
 
 
