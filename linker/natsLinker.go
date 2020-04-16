@@ -1,6 +1,7 @@
 package linker
 
 import (
+	"os"
 	"strconv"
 
 	"github.com/wmyi/gn/config"
@@ -96,7 +97,11 @@ func (nl *natsLinker) GetConnection() interface{} {
 }
 func (nl *natsLinker) Run() error {
 	if nl.natsC == nil && !nl.isRuning {
-		var address string = nl.natsConf.Host + ":" + strconv.Itoa(nl.natsConf.Port)
+		var address string
+		address = os.Getenv("NATS_URI")
+		if len(address) <= 0 {
+			address = nl.natsConf.Host + ":" + strconv.Itoa(nl.natsConf.Port)
+		}
 		connect, err := nats.Connect(address)
 
 		if err != nil {
