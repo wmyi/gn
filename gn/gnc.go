@@ -9,6 +9,9 @@ import (
 	"github.com/wmyi/gn/gnutil"
 )
 
+// H is a shortcut for map[string]interface{}
+type H map[string]interface{}
+
 // pack
 func NewPack(a IApp, ts *config.TSession, session *Session) IPack {
 	return &Pack{
