@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/spf13/viper"
 	"github.com/wmyi/gn/config"
 	"github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
@@ -53,6 +54,7 @@ type App struct {
 	runRoutineChan chan bool
 	maxRoutineNum  int
 	tagObjs        *sync.Map
+	vipers         map[string]*viper.Viper
 }
 
 func ParseCommands() {
@@ -80,6 +82,7 @@ func DefaultApp(conf *config.Config) (IApp, error) {
 			isRuning:      false,
 			maxRoutineNum: 1024, // defalut maxRoutine 同时
 			tagObjs:       new(sync.Map),
+			vipers:        make(map[string]*viper.Viper, 1<<4),
 		}
 		serverConfig := conf.GetServerConfByServerId(serverId)
 		// timeout
@@ -118,6 +121,23 @@ func (a *App) GetObjectByTag(tag string) (interface{}, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (a *App) GetConfigViper(keyName string) *viper.Viper {
+	return a.vipers[keyName]
+}
+func (a *App) AddConfigFile(keyName, path, configType string) error {
+	if len(keyName) > 0 && len(path) > 0 {
+		viper.SetConfigName(keyName)
+		viper.SetConfigType(configType)
+		viper.SetConfigFile(path)
+		if err := viper.ReadInConfig(); err != nil {
+			return err
+		}
+		file := viper.GetViper()
+		a.vipers[keyName] = file
+	}
+	return nil
 }
 
 func (a *App) DelObjectByTag(tag string) {
