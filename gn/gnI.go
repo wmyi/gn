@@ -89,4 +89,10 @@ type IApp interface {
 	GetRunRoutineNum() int
 	AddConfigFile(keyName, path, configType string) error
 	GetConfigViper(keyName string) *viper.Viper
+	UseMiddleWare(middleWare ...GNMiddleWare)
+}
+
+type GNMiddleWare interface {
+	Before(IPack)
+	After(IPack)
 }

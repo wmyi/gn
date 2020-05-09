@@ -55,6 +55,7 @@ type App struct {
 	maxRoutineNum  int
 	tagObjs        *sync.Map
 	vipers         map[string]*viper.Viper
+	middlerWares   []GNMiddleWare
 }
 
 func ParseCommands() {
@@ -83,6 +84,7 @@ func DefaultApp(conf *config.Config) (IApp, error) {
 			maxRoutineNum: 1024, // defalut maxRoutine 同时
 			tagObjs:       new(sync.Map),
 			vipers:        make(map[string]*viper.Viper, 1<<4),
+			middlerWares:  make([]GNMiddleWare, 0, 1<<3),
 		}
 		serverConfig := conf.GetServerConfByServerId(serverId)
 		// timeout
@@ -452,13 +454,20 @@ func (a *App) callRPCHandlers(pack IPack) {
 			handlers, ok := a.rpcRouters[pack.GetRouter()]
 			a.rpcRouterMutex.RUnlock()
 			if len(handlers) > 0 && ok {
+				//middlerware before
+				for _, ware := range a.middlerWares {
+					ware.Before(pack)
+				}
 				for _, handler := range handlers {
 					handler(pack)
 					if pack.IsAbort() {
 						break
 					}
 				}
-
+				//middlerware after
+				for _, ware := range a.middlerWares {
+					ware.After(pack)
+				}
 				if len(pack.GetSrcSubRouter()) > 0 {
 					replyPack := &config.TSession{
 						Cid:          pack.GetSession().GetCid(),
@@ -517,12 +526,20 @@ func (a *App) callAPIHandlers(pack IPack) {
 			handlers := a.apiRouters[pack.GetRouter()]
 			a.apiRouterMutex.RUnlock()
 			if len(handlers) > 0 {
+				//middlerware before
+				for _, ware := range a.middlerWares {
+					ware.Before(pack)
+				}
 				//  handler
 				for _, handler := range handlers {
 					handler(pack)
 					if pack.IsAbort() {
 						break
 					}
+				}
+				// middleware after
+				for _, ware := range a.middlerWares {
+					ware.After(pack)
 				}
 				//  next results send  link
 				if pack.GetResults() != nil && len(pack.GetResults()) > 0 {
@@ -646,4 +663,8 @@ func (a *App) AddExceptionHandler(handler gnError.ExceptionHandleFunc) {
 
 func (a *App) GetLinker() linker.ILinker {
 	return a.links
+}
+
+func (a *App) UseMiddleWare(middleWare ...GNMiddleWare) {
+	a.middlerWares = append(a.middlerWares, middleWare...)
 }
