@@ -47,6 +47,8 @@ type IPack interface {
 	GetBindId() string
 	SetRPCRespCode(code int)
 	GetRPCRespCode() int32
+	GetContextValue(key string) interface{}
+	SetContextValue(key string, value interface{})
 }
 
 // IApp

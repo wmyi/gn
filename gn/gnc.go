@@ -30,6 +30,24 @@ type Pack struct {
 	session     *Session
 	handlerTObj interface{}
 	ts          *config.TSession
+	contextMap  map[string]interface{}
+}
+
+func (p *Pack) SetContextValue(key string, value interface{}) {
+	if len(key) > 0 && value != nil {
+		if p.contextMap == nil {
+			p.contextMap = make(map[string]interface{}, 1<<2)
+		}
+		p.contextMap[key] = value
+	}
+
+}
+
+func (p *Pack) GetContextValue(key string) interface{} {
+	if len(key) > 0 {
+		return p.contextMap[key]
+	}
+	return nil
 }
 
 func (p *Pack) Abort() {
