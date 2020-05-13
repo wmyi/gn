@@ -132,7 +132,7 @@ func (a *App) AddConfigFile(keyName, path, configType string) error {
 	if len(keyName) > 0 && len(path) > 0 {
 		viper.SetConfigName(keyName)
 		viper.SetConfigType(configType)
-		viper.SetConfigFile(path)
+		viper.AddConfigPath(path)
 		if err := viper.ReadInConfig(); err != nil {
 			return err
 		}
