@@ -3,6 +3,8 @@ package gn
 import (
 	"sync"
 
+	"github.com/spf13/viper"
+
 	"github.com/wmyi/gn/config"
 	"github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
@@ -45,6 +47,8 @@ type IPack interface {
 	GetBindId() string
 	SetRPCRespCode(code int)
 	GetRPCRespCode() int32
+	GetContextValue(key string) interface{}
+	SetContextValue(key string, value interface{})
 }
 
 // IApp
@@ -85,4 +89,12 @@ type IApp interface {
 	AddExceptionHandler(handler gnError.ExceptionHandleFunc)
 	GetLinker() linker.ILinker
 	GetRunRoutineNum() int
+	AddConfigFile(keyName, path, configType string) error
+	GetConfigViper(keyName string) *viper.Viper
+	UseMiddleWare(middleWare ...GNMiddleWare)
+}
+
+type GNMiddleWare interface {
+	Before(IPack)
+	After(IPack)
 }
