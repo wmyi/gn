@@ -32,13 +32,16 @@ var (
 )
 
 type App struct {
-	config         *config.Config
-	apiRouters     map[string]*Handler
-	rpcRouters     map[string]*Handler
-	links          linker.ILinker
-	groups         *sync.Map
-	outChan        chan *config.TSession
-	inChan         chan []byte
+	config     *config.Config
+	apiRouters map[string]*Handler
+	rpcRouters map[string]*Handler
+	links      linker.ILinker
+	groups     *sync.Map
+	outChan    chan *config.TSession
+	inChan     chan []byte
+	apiInChan  chan IPack
+	rpcInChan  chan IPack
+
 	rpcRespMap     map[string]chan IPack
 	rpcHandleMutex sync.RWMutex
 	handleTimeOut  int
@@ -49,6 +52,8 @@ type App struct {
 	isRuning       bool
 	RRoutineCan    context.CancelFunc
 	WRoutineCan    context.CancelFunc
+	APIRoutineCan  context.CancelFunc
+	RPCRoutineCan  context.CancelFunc
 	runRoutineChan chan bool
 	maxRoutineNum  int
 	tagObjs        *sync.Map
@@ -75,6 +80,8 @@ func DefaultApp(conf *config.Config) (IApp, error) {
 			rpcRouters:    make(map[string]*Handler, 1<<7),
 			outChan:       make(chan *config.TSession, 1<<10),
 			inChan:        make(chan []byte, 1<<10),
+			apiInChan:     make(chan IPack, 1<<9),
+			rpcInChan:     make(chan IPack, 1<<9),
 			rpcRespMap:    make(map[string]chan IPack, 1<<10),
 			handleTimeOut: 10,
 			rpcTimeOut:    5,
@@ -177,6 +184,15 @@ func (a *App) Run() error {
 		wctx, wcancal := context.WithCancel(context.Background())
 		go a.loopWriteChanMsg(wctx)
 		a.WRoutineCan = wcancal
+
+		apiCtx, apiCancal := context.WithCancel(context.Background())
+		go a.loopAPIReadCHanMsg(apiCtx)
+		a.APIRoutineCan = apiCancal
+
+		rpcCtx, rpcCancal := context.WithCancel(context.Background())
+		go a.loopRPCReadCHanMsg(rpcCtx)
+		a.RPCRoutineCan = rpcCancal
+
 		a.exDetect.Run(false)
 		return nil
 	} else {
@@ -380,14 +396,52 @@ func (a *App) decodeFrontPack(data []byte) {
 	if dTsession.GetSt() == config.TSession_CMD {
 		a.cmdMaster.ReceiveCmdPack(pack)
 	} else if dTsession.GetSt() == config.TSession_CONNECTOR {
-		if len(pack.GetSession().GetCid()) > 0 {
-			a.callAPIHandlers(pack)
+		if a.apiInChan != nil {
+			a.apiInChan <- pack
 		}
 	} else if dTsession.GetSt() == config.TSession_LOGIC {
-		if len(pack.GetSrcSubRouter()) > 0 && len(pack.GetDstSubRouter()) > 0 {
-			a.callRPCHandlers(pack)
+		if a.rpcInChan != nil {
+			a.rpcInChan <- pack
 		}
 	}
+}
+
+func (a *App) loopRPCReadCHanMsg(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			a.logger.Errorf("App APIReadCHanMsg Routine panic ", string(debug.Stack()))
+		}
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case pack, ok := <-a.rpcInChan:
+			if ok && pack != nil && len(pack.GetSrcSubRouter()) > 0 && len(pack.GetDstSubRouter()) > 0 {
+				a.callRPCHandlers(pack)
+			}
+		}
+	}
+
+}
+
+func (a *App) loopAPIReadCHanMsg(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			a.logger.Errorf("App APIReadCHanMsg Routine panic ", string(debug.Stack()))
+		}
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case pack, ok := <-a.apiInChan:
+			if ok && pack != nil && len(pack.GetSession().GetCid()) > 0 {
+				a.callAPIHandlers(pack)
+			}
+		}
+	}
+
 }
 
 func (a *App) loopReadChanMsg(ctx context.Context) {
@@ -421,6 +475,13 @@ func (a *App) Done() {
 			a.links.Done()
 		}
 
+		if a.APIRoutineCan != nil {
+			a.APIRoutineCan()
+		}
+
+		if a.RPCRoutineCan != nil {
+			a.RPCRoutineCan()
+		}
 		if a.cmdMaster != nil {
 			a.cmdMaster.Done()
 		}
