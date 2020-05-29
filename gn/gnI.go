@@ -1,8 +1,6 @@
 package gn
 
 import (
-	"sync"
-
 	"github.com/spf13/viper"
 
 	"github.com/wmyi/gn/config"
@@ -19,10 +17,10 @@ type ChanMsgPacket struct {
 	body     []byte //body
 }
 
-// router
-type IRouter interface {
-	APIRouter(router string, handlers ...HandlerFunc)
-	RPCRouter(router string, handler HandlerFunc)
+// handler  router 注册
+type Handler struct {
+	Funcs      []HandlerFunc
+	NewRoutine bool
 }
 
 // pack  interface
@@ -56,18 +54,18 @@ type IApp interface {
 	PushMsg(session *Session, data []byte)
 	PushJsonMsg(session *Session, obj interface{})
 	PushProtoBufMsg(session *Session, obj interface{})
-	SendRPCMsg(serverId string, handlerName string, data []byte) (IPack, error)
-	SendRPCJsonMsg(serverId string, handlerName string, obj interface{}) (IPack, error)
-	SendRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) (IPack, error)
-	APIRouter(router string, handlers ...HandlerFunc)
-	RPCRouter(router string, handler HandlerFunc)
+
+	NotifyRPCMsg(serverId string, handlerName string, data []byte) error
+	NotifyRPCJsonMsg(serverId string, handlerName string, obj interface{}) error
+	NotifyRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) error
+	RequestRPCMsg(serverId string, handlerName string, data []byte) (IPack, error)
+	RequestRPCJsonMsg(serverId string, handlerName string, obj interface{}) (IPack, error)
+	RequestRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) (IPack, error)
+
+	APIRouter(router string, newGoRoutine bool, handlerFunc ...HandlerFunc)
+	RPCRouter(router string, newGoRoutine bool, handlerFunc HandlerFunc)
 
 	CMDHandler(cmd string, handler HandlerFunc)
-
-	NewRouter() IRouter
-
-	GetAPIRounterLock() *sync.RWMutex
-	GetRPCRounterLock() *sync.RWMutex
 
 	NewGroup(groupName string) *Group
 	GetGroup(groupName string) (*Group, bool)

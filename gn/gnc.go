@@ -166,25 +166,6 @@ func (s *Session) GetSrcSubRouter() string {
 	return s.srcNodeId
 }
 
-// router
-
-type Router struct {
-	app        IApp
-	apiRouters map[string][]HandlerFunc
-	rpcRouters map[string][]HandlerFunc
-}
-
-func (r *Router) APIRouter(router string, handlers ...HandlerFunc) {
-	if len(router) > 0 {
-		r.app.APIRouter(router, handlers...)
-	}
-}
-func (r *Router) RPCRouter(router string, handler HandlerFunc) {
-	if len(router) > 0 {
-		r.app.RPCRouter(router, handler)
-	}
-}
-
 // group
 type Group struct {
 	app         IApp

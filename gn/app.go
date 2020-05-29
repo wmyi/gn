@@ -33,16 +33,14 @@ var (
 
 type App struct {
 	config         *config.Config
-	apiRouters     map[string][]HandlerFunc
-	rpcRouters     map[string][]HandlerFunc
+	apiRouters     map[string]*Handler
+	rpcRouters     map[string]*Handler
 	links          linker.ILinker
 	groups         *sync.Map
 	outChan        chan *config.TSession
 	inChan         chan []byte
 	rpcRespMap     map[string]chan IPack
 	rpcHandleMutex sync.RWMutex
-	apiRouterMutex sync.RWMutex
-	rpcRouterMutex sync.RWMutex
 	handleTimeOut  int
 	rpcTimeOut     int
 	exDetect       *gnError.GnExceptionDetect
@@ -73,8 +71,8 @@ func DefaultApp(conf *config.Config) (IApp, error) {
 	appOnce.Do(func() {
 		instance = &App{
 			config:        conf,
-			apiRouters:    make(map[string][]HandlerFunc, 1<<7),
-			rpcRouters:    make(map[string][]HandlerFunc, 1<<7),
+			apiRouters:    make(map[string]*Handler, 1<<7),
+			rpcRouters:    make(map[string]*Handler, 1<<7),
 			outChan:       make(chan *config.TSession, 1<<10),
 			inChan:        make(chan []byte, 1<<10),
 			rpcRespMap:    make(map[string]chan IPack, 1<<10),
@@ -150,14 +148,6 @@ func (a *App) DelObjectByTag(tag string) {
 
 func (a *App) GetLogger() *glog.Glogger {
 	return a.logger
-}
-
-func (a *App) GetAPIRounterLock() *sync.RWMutex {
-	return &a.apiRouterMutex
-}
-
-func (a *App) GetRPCRounterLock() *sync.RWMutex {
-	return &a.rpcRouterMutex
 }
 
 func (a *App) Run() error {
@@ -242,7 +232,42 @@ func (a *App) PushProtoBufMsg(session *Session, obj interface{}) {
 
 }
 
-func (a *App) SendRPCMsg(serverId string, handlerName string, data []byte) (IPack, error) {
+func (a *App) NotifyRPCMsg(serverId string, handlerName string, data []byte) error {
+	if len(serverId) > 0 && len(handlerName) > 0 {
+		// send msg
+		// notify no set  ReplyToken  来区分 不 回传消息报
+		pack := &config.TSession{
+			SrcSubRouter: a.links.GetSubRounter(),
+			DstSubRouter: serverId,
+			Body:         data,
+			St:           config.TSession_LOGIC,
+			Router:       handlerName,
+		}
+		if a.outChan != nil {
+			a.outChan <- pack
+		}
+		return nil
+	}
+	return gnError.ErrRPCParameter
+
+}
+func (a *App) NotifyRPCJsonMsg(serverId string, handlerName string, obj interface{}) error {
+	out, ok := gnutil.JsonToBytes(obj, a.logger)
+	if ok {
+		return a.NotifyRPCMsg(serverId, handlerName, out)
+	}
+	return gnError.ErrRPCParameter
+}
+func (a *App) NotifyRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) error {
+	out, ok := gnutil.ProtoBufToBytes(obj, a.logger)
+	if ok {
+		return a.NotifyRPCMsg(serverId, handlerName, out)
+	}
+
+	return gnError.ErrRPCParameter
+}
+
+func (a *App) RequestRPCMsg(serverId string, handlerName string, data []byte) (IPack, error) {
 	if len(serverId) > 0 && len(handlerName) > 0 {
 		token := serverId + "-" + strconv.FormatUint(atomic.AddUint64(&ReTokenBase, 1), 10)
 		msgChan := make(chan IPack, 1)
@@ -285,17 +310,17 @@ func (a *App) SendRPCMsg(serverId string, handlerName string, data []byte) (IPac
 	}
 }
 
-func (a *App) SendRPCJsonMsg(serverId string, handlerName string, obj interface{}) (IPack, error) {
+func (a *App) RequestRPCJsonMsg(serverId string, handlerName string, obj interface{}) (IPack, error) {
 	out, ok := gnutil.JsonToBytes(obj, a.logger)
 	if ok {
-		return a.SendRPCMsg(serverId, handlerName, out)
+		return a.RequestRPCMsg(serverId, handlerName, out)
 	}
 	return nil, gnError.ErrRPCParameter
 }
-func (a *App) SendRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) (IPack, error) {
+func (a *App) RequestRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) (IPack, error) {
 	out, ok := gnutil.ProtoBufToBytes(obj, a.logger)
 	if ok {
-		return a.SendRPCMsg(serverId, handlerName, out)
+		return a.RequestRPCMsg(serverId, handlerName, out)
 	}
 
 	return nil, gnError.ErrRPCParameter
@@ -314,7 +339,7 @@ func (a *App) loopWriteChanMsg(ctx context.Context) {
 		case data, ok := <-a.outChan:
 			if ok {
 				// parse msg to  nats   or  end server
-				a.logger.Infof(" app  receive message bindId %s   msg:  %v ", data.GetLogicBindId(), string(data.GetBody()))
+				a.logger.Infof(" app  Send linker message bindId %s   msg:  %v ", data.GetLogicBindId(), string(data.GetBody()))
 				if len(data.GetDstSubRouter()) > 0 {
 					// push
 					out, err := proto.Marshal(data)
@@ -342,7 +367,6 @@ func (a *App) decodeFrontPack(data []byte) {
 	dTsession := &config.TSession{}
 
 	err := proto.Unmarshal(data, dTsession)
-	a.logger.Infof(" app  in  reveice msg      %v ", string(data))
 	if err != nil {
 		a.logger.Errorf("  app in revice pb msg   UnMarsha err   %v ", err)
 		a.exDetect.ThrowException(&gnError.GnException{
@@ -357,16 +381,11 @@ func (a *App) decodeFrontPack(data []byte) {
 		a.cmdMaster.ReceiveCmdPack(pack)
 	} else if dTsession.GetSt() == config.TSession_CONNECTOR {
 		if len(pack.GetSession().GetCid()) > 0 {
-
-			// runtine number +1 if block wait
-			a.runRoutineChan <- true
-			go a.callAPIHandlers(pack)
+			a.callAPIHandlers(pack)
 		}
 	} else if dTsession.GetSt() == config.TSession_LOGIC {
-		if len(pack.GetReplyToken()) > 0 {
-			// runtine number +1 if block wait
-			a.runRoutineChan <- true
-			go a.callRPCHandlers(pack)
+		if len(pack.GetSrcSubRouter()) > 0 && len(pack.GetDstSubRouter()) > 0 {
+			a.callRPCHandlers(pack)
 		}
 	}
 }
@@ -414,8 +433,7 @@ func (a *App) Done() {
 
 	}
 }
-
-func (a *App) callRPCHandlers(pack IPack) {
+func (a *App) rpcGoRouinteHandler(pack IPack, handlerFuncs []HandlerFunc) {
 	defer func() {
 		if r := recover(); r != nil {
 			a.logger.Errorf("App RPC receive IPack routine panic ", string(debug.Stack()))
@@ -426,7 +444,7 @@ func (a *App) callRPCHandlers(pack IPack) {
 
 	ctx, _ := context.WithTimeout(context.Background(), time.Duration(a.handleTimeOut)*time.Second)
 	endChan := make(chan bool)
-	go func(ctx context.Context, finishChan chan<- bool) {
+	go func(ctx context.Context, finishChan chan<- bool, handlerFuncs []HandlerFunc, pack IPack) {
 		defer func() {
 			if r := recover(); r != nil {
 				a.logger.Errorf("App handle RPC callback  routine panic ", string(debug.Stack()))
@@ -437,58 +455,9 @@ func (a *App) callRPCHandlers(pack IPack) {
 		}()
 		// runtine number +1
 		a.runRoutineChan <- true
-		if len(pack.GetRouter()) == 0 && len(pack.GetReplyToken()) > 0 {
-			a.rpcHandleMutex.Lock()
-			respChan, ok := a.rpcRespMap[pack.GetReplyToken()]
-			if ok && respChan != nil {
-				delete(a.rpcRespMap, pack.GetReplyToken())
-			}
-			a.rpcHandleMutex.Unlock()
-			if respChan != nil {
-				respChan <- pack
-			} else {
-				a.logger.Errorf("App handle RPC Respon callback  routine  %v ", pack)
-			}
-		} else if len(pack.GetRouter()) > 0 {
-			a.rpcRouterMutex.RLock()
-			handlers, ok := a.rpcRouters[pack.GetRouter()]
-			a.rpcRouterMutex.RUnlock()
-			if len(handlers) > 0 && ok {
-				//middlerware before
-				for _, ware := range a.middlerWares {
-					ware.Before(pack)
-				}
-				for _, handler := range handlers {
-					handler(pack)
-					if pack.IsAbort() {
-						break
-					}
-				}
-				//middlerware after
-				for _, ware := range a.middlerWares {
-					ware.After(pack)
-				}
-				if len(pack.GetSrcSubRouter()) > 0 {
-					replyPack := &config.TSession{
-						Cid:          pack.GetSession().GetCid(),
-						SrcSubRouter: pack.GetDstSubRouter(),
-						DstSubRouter: pack.GetSrcSubRouter(),
-						Body:         pack.GetResults(),
-						St:           config.TSession_LOGIC,
-						ReplyToken:   pack.GetReplyToken(),
-						RpcRespCode:  pack.GetRPCRespCode(),
-					}
-					if a.outChan != nil {
-						a.outChan <- replyPack
-					}
-
-				}
-
-			} else {
-				a.logger.Errorf("App  RPCHandlers NO  router  %s   please add  handler", pack.GetRouter())
-			}
-		}
-	}(ctx, endChan)
+		a.rangeHandler(pack, handlerFuncs)
+		a.rpcResultPack(pack)
+	}(ctx, endChan, handlerFuncs, pack)
 	select {
 	case <-ctx.Done():
 		panic(gnError.ErrRPCHandleTimeOut)
@@ -498,8 +467,59 @@ func (a *App) callRPCHandlers(pack IPack) {
 	}
 }
 
-func (a *App) callAPIHandlers(pack IPack) {
+func (a *App) rpcResultPack(pack IPack) {
+	if len(pack.GetSrcSubRouter()) > 0 && len(pack.GetDstSubRouter()) > 0 &&
+		len(pack.GetReplyToken()) > 0 {
+		replyPack := &config.TSession{
+			Cid:          pack.GetSession().GetCid(),
+			SrcSubRouter: pack.GetDstSubRouter(),
+			DstSubRouter: pack.GetSrcSubRouter(),
+			Body:         pack.GetResults(),
+			St:           config.TSession_LOGIC,
+			ReplyToken:   pack.GetReplyToken(),
+			RpcRespCode:  pack.GetRPCRespCode(),
+		}
 
+		if a.outChan != nil {
+			a.outChan <- replyPack
+		}
+	}
+}
+
+func (a *App) callRPCHandlers(pack IPack) {
+	if len(pack.GetRouter()) == 0 && len(pack.GetReplyToken()) > 0 {
+		a.rpcHandleMutex.Lock()
+		respChan, ok := a.rpcRespMap[pack.GetReplyToken()]
+		if ok && respChan != nil {
+			delete(a.rpcRespMap, pack.GetReplyToken())
+		}
+		a.rpcHandleMutex.Unlock()
+		if respChan != nil {
+			respChan <- pack
+		} else {
+			a.logger.Errorf("App handle RPC Respon callback  routine  %v ", pack)
+		}
+	} else if len(pack.GetRouter()) > 0 {
+		if handler, ok := a.rpcRouters[pack.GetRouter()]; ok && handler != nil && len(handler.Funcs) > 0 {
+
+			if handler.NewRoutine {
+				// runtine number +1 if block wait
+				a.runRoutineChan <- true
+				go a.rpcGoRouinteHandler(pack, handler.Funcs)
+			} else {
+				// range handler rpc
+				a.rangeHandler(pack, handler.Funcs)
+				//  next results send  link
+				a.rpcResultPack(pack)
+			}
+		} else {
+			a.logger.Errorf("App  RPCHandlers NO  router  %s   please add  handler", pack.GetRouter())
+		}
+	}
+
+}
+
+func (a *App) apiGoRouinteHandler(pack IPack, handlerFuncs []HandlerFunc) {
 	defer func() {
 		if r := recover(); r != nil {
 			a.logger.Errorf("App receive IPack routine panic ", string(debug.Stack()))
@@ -510,7 +530,7 @@ func (a *App) callAPIHandlers(pack IPack) {
 
 	endChan := make(chan bool, 1)
 	ctx, _ := context.WithTimeout(context.Background(), time.Duration(a.handleTimeOut)*time.Second)
-	go func(ctx context.Context, finishChan chan<- bool) {
+	go func(ctx context.Context, finishChan chan<- bool, handlerFuncs []HandlerFunc, pack IPack) {
 		defer func() {
 			if r := recover(); r != nil {
 				a.logger.Errorf("App handle api callback  routine panic ", string(debug.Stack()))
@@ -521,47 +541,11 @@ func (a *App) callAPIHandlers(pack IPack) {
 		}()
 		// runtine number +1
 		a.runRoutineChan <- true
-		if len(pack.GetRouter()) > 0 {
-			a.apiRouterMutex.RLock()
-			handlers := a.apiRouters[pack.GetRouter()]
-			a.apiRouterMutex.RUnlock()
-			if len(handlers) > 0 {
-				//middlerware before
-				for _, ware := range a.middlerWares {
-					ware.Before(pack)
-				}
-				//  handler
-				for _, handler := range handlers {
-					handler(pack)
-					if pack.IsAbort() {
-						break
-					}
-				}
-				// middleware after
-				for _, ware := range a.middlerWares {
-					ware.After(pack)
-				}
-				//  next results send  link
-				if pack.GetResults() != nil && len(pack.GetResults()) > 0 {
-					replyPack := &config.TSession{
-						Cid:          pack.GetSession().GetCid(),
-						SrcSubRouter: pack.GetDstSubRouter(),
-						DstSubRouter: pack.GetSrcSubRouter(),
-						Body:         pack.GetResults(),
-						St:           config.TSession_LOGIC,
-						LogicBindId:  pack.GetSession().GetBindId(),
-					}
-					if a.outChan != nil {
-						a.outChan <- replyPack
-					}
-				}
-			} else {
-				a.logger.Errorf("App API RECALL  router  %s  handler is nil ", pack.GetRouter())
-				a.ErrorToConnector(pack.GetSession(), gnError.ErrAPIHandleTimeOutCode, gnError.ErrAPINOHandle.Error())
-			}
-		}
-
-	}(ctx, endChan)
+		// for range middlerware and handler
+		a.rangeHandler(pack, handlerFuncs)
+		//  next results send  link
+		a.apiResultPack(pack)
+	}(ctx, endChan, handlerFuncs, pack)
 	select {
 	case <-endChan:
 		// finish
@@ -573,6 +557,62 @@ func (a *App) callAPIHandlers(pack IPack) {
 		a.ErrorToConnector(pack.GetSession(), gnError.ErrAPIHandleTimeOutCode, gnError.ErrAPIHandleTimeOut.Error())
 		panic(gnError.ErrAPIHandleTimeOut)
 	}
+}
+
+func (a *App) rangeHandler(pack IPack, handlerFuncs []HandlerFunc) {
+	//middlerware before
+	for _, ware := range a.middlerWares {
+		ware.Before(pack)
+	}
+	//  handler
+	for _, handler := range handlerFuncs {
+		handler(pack)
+		if pack.IsAbort() {
+			break
+		}
+	}
+	// middleware after
+	for _, ware := range a.middlerWares {
+		ware.After(pack)
+	}
+}
+
+func (a *App) apiResultPack(pack IPack) {
+	if len(pack.GetSrcSubRouter()) > 0 && len(pack.GetDstSubRouter()) > 0 {
+		replyPack := &config.TSession{
+			Cid:          pack.GetSession().GetCid(),
+			SrcSubRouter: pack.GetDstSubRouter(),
+			DstSubRouter: pack.GetSrcSubRouter(),
+			Body:         pack.GetResults(),
+			St:           config.TSession_LOGIC,
+			LogicBindId:  pack.GetSession().GetBindId(),
+		}
+		if a.outChan != nil {
+			a.outChan <- replyPack
+		}
+	}
+}
+
+func (a *App) callAPIHandlers(pack IPack) {
+	if len(pack.GetRouter()) > 0 {
+		if handler, ok := a.apiRouters[pack.GetRouter()]; ok && handler != nil && len(handler.Funcs) > 0 {
+			if handler.NewRoutine {
+				// runtine number +1 if block wait
+				a.runRoutineChan <- true
+				go a.apiGoRouinteHandler(pack, handler.Funcs)
+
+			} else {
+				// for range middlerware and handler
+				a.rangeHandler(pack, handler.Funcs)
+				//  next results send  link
+				a.apiResultPack(pack)
+			}
+		} else {
+			a.logger.Errorf("App API RECALL  router  %s  handler is nil ", pack.GetRouter())
+			a.ErrorToConnector(pack.GetSession(), gnError.ErrAPIHandleTimeOutCode, gnError.ErrAPINOHandle.Error())
+		}
+	}
+
 }
 
 func (a *App) CMDHandler(cmd string, handler HandlerFunc) {
@@ -596,32 +636,26 @@ func (a *App) ErrorToConnector(session *Session, code string, errorMsg string) {
 
 }
 
-func (a *App) APIRouter(router string, handlers ...HandlerFunc) {
+func (a *App) APIRouter(router string, newGoRoutine bool, handlerFunc ...HandlerFunc) {
 	if a.apiRouters != nil {
-		a.apiRouterMutex.Lock()
-		if a.apiRouters[router] == nil {
-			a.apiRouters[router] = make([]HandlerFunc, 0, 1<<8)
+		if handler, ok := a.apiRouters[router]; !ok && handler == nil {
+			a.apiRouters[router] = &Handler{
+				NewRoutine: newGoRoutine,
+				Funcs:      make([]HandlerFunc, 0, 1<<8),
+			}
 		}
-		a.apiRouters[router] = append(a.apiRouters[router], handlers...)
-		a.apiRouterMutex.Unlock()
+		a.apiRouters[router].Funcs = append(a.apiRouters[router].Funcs, handlerFunc...)
 	}
 }
-func (a *App) RPCRouter(router string, handlers HandlerFunc) {
+func (a *App) RPCRouter(router string, newGoRoutine bool, handlerFunc HandlerFunc) {
 	if a.rpcRouters != nil {
-		a.rpcHandleMutex.Lock()
-		if a.rpcRouters[router] == nil {
-			a.rpcRouters[router] = make([]HandlerFunc, 0, 1<<8)
+		if handler, ok := a.rpcRouters[router]; !ok && handler == nil {
+			a.rpcRouters[router] = &Handler{
+				NewRoutine: newGoRoutine,
+				Funcs:      make([]HandlerFunc, 0, 1<<8),
+			}
 		}
-		a.rpcRouters[router] = append(a.rpcRouters[router], handlers)
-		a.rpcHandleMutex.Unlock()
-	}
-}
-
-func (a *App) NewRouter() IRouter {
-	return &Router{
-		app:        a,
-		apiRouters: a.apiRouters,
-		rpcRouters: a.rpcRouters,
+		a.rpcRouters[router].Funcs = append(a.rpcRouters[router].Funcs, handlerFunc)
 	}
 }
 
