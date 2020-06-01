@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/wmyi/gn/glog"
+	logger "github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 
 	"github.com/google/uuid"
@@ -42,7 +42,6 @@ type WSConnection struct {
 	wsConn          *websocket.Conn
 	cid             string
 	bindId          string
-	logger          *glog.Glogger
 	readRoutineCan  context.CancelFunc
 	writeRoutineCan context.CancelFunc
 	isRuning        bool
@@ -63,7 +62,7 @@ func (wc *WSConnection) GetConnectionCid() string {
 func (wc *WSConnection) ReadMsg(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			wc.logger.Errorf("ws  soeckt Read Routine panic ", string(debug.Stack()))
+			logger.Errorf("ws  soeckt Read Routine panic ", string(debug.Stack()))
 			// wc.wsConn.Close()
 		}
 	}()
@@ -80,9 +79,9 @@ func (wc *WSConnection) ReadMsg(ctx context.Context) {
 		msgType, message, err := wc.wsConn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				wc.logger.Errorf("ws  soeckt Read err- ", err)
+				logger.Errorf("ws  soeckt Read err- ", err)
 			}
-			wc.logger.Errorf("ws  soeckt Read err-   %v", err)
+			logger.Errorf("ws  soeckt Read err-   %v", err)
 			break
 		}
 		if msgType == websocket.TextMessage {
@@ -95,7 +94,7 @@ func (wc *WSConnection) ReadMsg(ctx context.Context) {
 				logicBindID: wc.GetBindId(),
 			}
 		}
-		wc.logger.Infof("ws  soeckt receive  id:  %d  msg  %s ", wc.bindId, string(message))
+		logger.Infof("ws  soeckt receive  id:  %d  msg  %s ", wc.bindId, string(message))
 	}
 }
 
@@ -120,14 +119,14 @@ func (wc *WSConnection) WriteMsg(ctx context.Context) {
 		if r := recover(); r != nil {
 			ticker.Stop()
 			wc.wsConn.Close()
-			wc.logger.Errorf("ws  soeckt write Routine panic ", string(debug.Stack()))
+			logger.Errorf("ws  soeckt write Routine panic ", string(debug.Stack()))
 		}
 	}()
 
 	for {
 		select {
 		case message, ok := <-wc.RChan:
-			wc.logger.Infof("ws  write msg   %v ", string(message))
+			logger.Infof("ws  write msg   %v ", string(message))
 			wc.wsConn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// if !ok {
@@ -148,13 +147,13 @@ func (wc *WSConnection) WriteMsg(ctx context.Context) {
 				w.Write(<-wc.RChan)
 			}
 			if err := w.Close(); err != nil {
-				wc.logger.Errorf("ws  write msg close err   %v ", err)
+				logger.Errorf("ws  write msg close err   %v ", err)
 				return
 			}
 		case <-ticker.C:
 			wc.wsConn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := wc.wsConn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				wc.logger.Errorf("ws  write msg timeout     ")
+				logger.Errorf("ws  write msg timeout     ")
 				return
 			}
 		case <-ctx.Done():
@@ -206,14 +205,13 @@ func (wc *WSConnection) SetBindId(bindId string) {
 	wc.bindId = bindId
 }
 
-func NewWSConnection(conn *websocket.Conn, outChan chan *ChanMsgPack, logger *glog.Glogger,
+func NewWSConnection(conn *websocket.Conn, outChan chan *ChanMsgPack,
 	detect *gnError.GnExceptionDetect) *WSConnection {
 	return &WSConnection{
 		wsConn:   conn,
 		RChan:    make(chan []byte, 10),
 		WChan:    outChan,
 		cid:      uuid.New().String() + "-" + serverId + "-" + strconv.FormatUint(atomic.AddUint64(&cidAddBase, 1), 10),
-		logger:   logger,
 		isRuning: false,
 		exDetect: detect,
 	}

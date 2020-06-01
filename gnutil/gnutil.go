@@ -6,7 +6,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/wmyi/gn/config"
-	"github.com/wmyi/gn/glog"
+	logger "github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 )
 
@@ -23,8 +23,8 @@ func RPCcalculatorServerId(calculateId string, serverList []*config.ServersConfi
 	return "", gnError.ErrNotCalculateServerId
 }
 
-func JsonToBytes(obj interface{}, logger *glog.Glogger) ([]byte, bool) {
-	if obj != nil && logger != nil {
+func JsonToBytes(obj interface{}) ([]byte, bool) {
+	if obj != nil {
 		out, err := jsonI.Marshal(obj)
 		if err != nil {
 			logger.Errorf("Pack  ResultJson  jsonI.Marshal  err  ", err)
@@ -35,8 +35,8 @@ func JsonToBytes(obj interface{}, logger *glog.Glogger) ([]byte, bool) {
 	return nil, false
 }
 
-func ProtoBufToBytes(obj interface{}, logger *glog.Glogger) ([]byte, bool) {
-	if obj != nil && logger != nil {
+func ProtoBufToBytes(obj interface{}) ([]byte, bool) {
+	if obj != nil {
 		pbObj, ok := obj.(proto.Message)
 		if !ok {
 			logger.Errorf("Pack  ResultProtoBuf  obj is no proto.Message  type    ")

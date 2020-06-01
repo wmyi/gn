@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/wmyi/gn/config"
-	"github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 	"github.com/wmyi/gn/gnutil"
 )
@@ -80,7 +79,7 @@ func (p *Pack) GetRouter() string {
 }
 
 func (p *Pack) ResultJson(obj interface{}) {
-	out, ok := gnutil.JsonToBytes(obj, p.app.GetLogger())
+	out, ok := gnutil.JsonToBytes(obj)
 	if ok && out != nil {
 		p.resultbytes = out
 	}
@@ -98,7 +97,7 @@ func (p *Pack) ExceptionAbortJson(code, msg string) {
 
 func (p *Pack) ResultProtoBuf(obj interface{}) {
 
-	out, ok := gnutil.ProtoBufToBytes(obj, p.app.GetLogger())
+	out, ok := gnutil.ProtoBufToBytes(obj)
 	if ok && out != nil {
 		p.resultbytes = out
 	}
@@ -120,9 +119,7 @@ func (p *Pack) GetDstSubRouter() string {
 func (p *Pack) GetSrcSubRouter() string {
 	return p.ts.GetSrcSubRouter()
 }
-func (p *Pack) GetLogger() *glog.Glogger {
-	return p.app.GetLogger()
-}
+
 func (p *Pack) GetBindId() string {
 	return p.session.GetBindId()
 }
@@ -209,14 +206,14 @@ func (g *Group) BroadCast(bytes []byte) {
 }
 
 func (g *Group) BroadCastJson(obj interface{}) {
-	out, ok := gnutil.JsonToBytes(obj, g.app.GetLogger())
+	out, ok := gnutil.JsonToBytes(obj)
 	if ok && out != nil {
 		g.BroadCast(out)
 	}
 }
 
 func (g *Group) BroadCastProtoBuf(obj interface{}) {
-	out, ok := gnutil.ProtoBufToBytes(obj, g.app.GetLogger())
+	out, ok := gnutil.ProtoBufToBytes(obj)
 	if ok && out != nil {
 		g.BroadCast(out)
 	}

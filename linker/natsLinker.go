@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/wmyi/gn/config"
-	"github.com/wmyi/gn/glog"
+	logger "github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 
 	"github.com/nats-io/nats.go"
@@ -16,19 +16,17 @@ type natsLinker struct {
 	CWChan       chan []byte
 	natsConf     *config.Natsconfig
 	serverID     string
-	logger       *glog.Glogger
 	natsClientId uint64
 	isRuning     bool
 	exDetect     *gnError.GnExceptionDetect
 }
 
-func NewNatsClient(serverId string, natsConf *config.Natsconfig, outChan chan []byte, log *glog.Glogger,
+func NewNatsClient(serverId string, natsConf *config.Natsconfig, outChan chan []byte,
 	detect *gnError.GnExceptionDetect) *natsLinker {
 	nats := &natsLinker{
 		CWChan:   outChan,
 		natsConf: natsConf,
 		serverID: serverId,
-		logger:   log,
 		isRuning: false,
 		exDetect: detect,
 	}
@@ -105,7 +103,7 @@ func (nl *natsLinker) Run() error {
 		connect, err := nats.Connect(address)
 
 		if err != nil {
-			nl.logger.Errorf("nats  connect   ", err)
+			logger.Errorf("nats  connect   ", err)
 			return err
 		}
 		nl.natsC = connect
@@ -132,7 +130,7 @@ func (nl *natsLinker) SendMsg(router string, data []byte) {
 	if nl.natsC != nil {
 		err := nl.natsC.Publish(router, data)
 		if err != nil {
-			nl.logger.Errorf("natsLinker sendMsg   error  ", err)
+			logger.Errorf("natsLinker sendMsg   error  ", err)
 			nl.exDetect.ThrowException(&gnError.GnException{
 				Id:        nl.serverID,
 				Exception: gnError.NATS_SENDERROR,
@@ -151,18 +149,18 @@ func (nl *natsLinker) initNats() error {
 	if nl.natsC != nil {
 
 		_, err := nl.natsC.Subscribe(nl.GetSubRounter(), func(msg *nats.Msg) {
-			nl.logger.Infof("nats  receive   msg  %s   \n", string(msg.Data))
+			logger.Infof("nats  receive   msg  %s   \n", string(msg.Data))
 			nl.CWChan <- msg.Data
 		})
 		if err != nil {
 			nl.Done()
-			nl.logger.Errorf("nats subscribe error  %v", err)
+			logger.Errorf("nats subscribe error  %v", err)
 			return err
 		}
 
 		nl.natsClientId, err = nl.natsC.GetClientID()
 		if err == nil {
-			nl.logger.Infof("natsLinker Run done  urls: %v clientId: %d Subscribe: %s  ", nl.natsC.Servers(), nl.natsClientId, nl.GetSubRounter())
+			logger.Infof("natsLinker Run done  urls: %v clientId: %d Subscribe: %s  ", nl.natsC.Servers(), nl.natsClientId, nl.GetSubRounter())
 		} else {
 			return err
 		}

@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/wmyi/gn/config"
-	"github.com/wmyi/gn/glog"
+	logger "github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 	"github.com/wmyi/gn/gnutil"
 	"github.com/wmyi/gn/linker"
@@ -47,7 +47,6 @@ type App struct {
 	handleTimeOut  int
 	rpcTimeOut     int
 	exDetect       *gnError.GnExceptionDetect
-	logger         *glog.Glogger
 	cmdMaster      IAppCmd
 	isRuning       bool
 	RRoutineCan    context.CancelFunc
@@ -101,17 +100,17 @@ func DefaultApp(conf *config.Config) (IApp, error) {
 			instance.handleTimeOut = serverConfig.HandleTimeOut
 		}
 
-		instance.logger = glog.NewLogger(conf, serverId, mode)
-		instance.exDetect = gnError.NewGnExceptionDetect(instance.logger)
+		logger.SetConfig(conf, serverId, mode)
+		instance.exDetect = gnError.NewGnExceptionDetect()
 
 		if serverConfig != nil {
 			instance.links = linker.NewNatsClient(serverConfig.ID, &conf.Natsconf, instance.inChan,
-				instance.logger, instance.exDetect)
+				instance.exDetect)
 			instance.handleTimeOut = serverConfig.HandleTimeOut
 			instance.rpcTimeOut = serverConfig.RPCTimeOut
 			instance.maxRoutineNum = serverConfig.MaxRunRoutineNum
 		}
-		instance.cmdMaster = NewAppCmd(instance.logger, instance.links, instance.exDetect)
+		instance.cmdMaster = NewAppCmd(instance.links, instance.exDetect)
 	})
 	return instance, nil
 }
@@ -153,10 +152,6 @@ func (a *App) DelObjectByTag(tag string) {
 	}
 }
 
-func (a *App) GetLogger() *glog.Glogger {
-	return a.logger
-}
-
 func (a *App) Run() error {
 
 	if !a.isRuning {
@@ -170,12 +165,12 @@ func (a *App) Run() error {
 
 		err := a.links.Run()
 		if err != nil {
-			a.logger.Errorf("app natsLinker Run error  %v", err)
+			logger.Errorf("app natsLinker Run error  %v", err)
 			return err
 		}
 		err = a.cmdMaster.Run()
 		if err != nil {
-			a.logger.Errorf("app cmdApp Run error  %v", err)
+			logger.Errorf("app cmdApp Run error  %v", err)
 			return err
 		}
 		rctx, rcancal := context.WithCancel(context.Background())
@@ -196,7 +191,7 @@ func (a *App) Run() error {
 		a.exDetect.Run(false)
 		return nil
 	} else {
-		a.logger.Errorf("App is aleady Runing ")
+		logger.Errorf("App is aleady Runing ")
 		return gnError.ErrAPPRuning
 	}
 
@@ -231,7 +226,7 @@ func (a *App) PushMsg(session *Session, data []byte) {
 
 func (a *App) PushJsonMsg(session *Session, obj interface{}) {
 	if session != nil && obj != nil {
-		out, ok := gnutil.JsonToBytes(obj, a.logger)
+		out, ok := gnutil.JsonToBytes(obj)
 		if ok && out != nil {
 			a.PushMsg(session, out)
 		}
@@ -240,7 +235,7 @@ func (a *App) PushJsonMsg(session *Session, obj interface{}) {
 }
 func (a *App) PushProtoBufMsg(session *Session, obj interface{}) {
 	if session != nil && obj != nil {
-		out, ok := gnutil.ProtoBufToBytes(obj, a.logger)
+		out, ok := gnutil.ProtoBufToBytes(obj)
 		if ok && out != nil {
 			a.PushMsg(session, out)
 		}
@@ -268,14 +263,14 @@ func (a *App) NotifyRPCMsg(serverId string, handlerName string, data []byte) err
 
 }
 func (a *App) NotifyRPCJsonMsg(serverId string, handlerName string, obj interface{}) error {
-	out, ok := gnutil.JsonToBytes(obj, a.logger)
+	out, ok := gnutil.JsonToBytes(obj)
 	if ok {
 		return a.NotifyRPCMsg(serverId, handlerName, out)
 	}
 	return gnError.ErrRPCParameter
 }
 func (a *App) NotifyRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) error {
-	out, ok := gnutil.ProtoBufToBytes(obj, a.logger)
+	out, ok := gnutil.ProtoBufToBytes(obj)
 	if ok {
 		return a.NotifyRPCMsg(serverId, handlerName, out)
 	}
@@ -327,14 +322,14 @@ func (a *App) RequestRPCMsg(serverId string, handlerName string, data []byte) (I
 }
 
 func (a *App) RequestRPCJsonMsg(serverId string, handlerName string, obj interface{}) (IPack, error) {
-	out, ok := gnutil.JsonToBytes(obj, a.logger)
+	out, ok := gnutil.JsonToBytes(obj)
 	if ok {
 		return a.RequestRPCMsg(serverId, handlerName, out)
 	}
 	return nil, gnError.ErrRPCParameter
 }
 func (a *App) RequestRPCProtoBufMsg(serverId string, handlerName string, obj interface{}) (IPack, error) {
-	out, ok := gnutil.ProtoBufToBytes(obj, a.logger)
+	out, ok := gnutil.ProtoBufToBytes(obj)
 	if ok {
 		return a.RequestRPCMsg(serverId, handlerName, out)
 	}
@@ -345,7 +340,7 @@ func (a *App) RequestRPCProtoBufMsg(serverId string, handlerName string, obj int
 func (a *App) loopWriteChanMsg(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			a.logger.Errorf("App write Routine panic ", string(debug.Stack()))
+			logger.Errorf("App write Routine panic ", string(debug.Stack()))
 		}
 	}()
 	for {
@@ -355,14 +350,14 @@ func (a *App) loopWriteChanMsg(ctx context.Context) {
 		case data, ok := <-a.outChan:
 			if ok {
 				// parse msg to  nats   or  end server
-				a.logger.Infof(" app  Send linker message bindId %s   msg:  %v ", data.GetLogicBindId(), string(data.GetBody()))
+				logger.Infof(" app  Send linker message bindId %s   msg:  %v ", data.GetLogicBindId(), string(data.GetBody()))
 				if len(data.GetDstSubRouter()) > 0 {
 					// push
 					out, err := proto.Marshal(data)
 					if err == nil {
 						a.links.SendMsg(data.GetDstSubRouter(), out)
 					} else {
-						a.logger.Errorf(" app  receive message pb Marshal err %v ", err)
+						logger.Errorf(" app  receive message pb Marshal err %v ", err)
 					}
 				}
 			}
@@ -384,7 +379,7 @@ func (a *App) decodeFrontPack(data []byte) {
 
 	err := proto.Unmarshal(data, dTsession)
 	if err != nil {
-		a.logger.Errorf("  app in revice pb msg   UnMarsha err   %v ", err)
+		logger.Errorf("  app in revice pb msg   UnMarsha err   %v ", err)
 		a.exDetect.ThrowException(&gnError.GnException{
 			Id:        "",
 			Exception: gnError.PB_UMARSHAL_ERROR,
@@ -409,7 +404,7 @@ func (a *App) decodeFrontPack(data []byte) {
 func (a *App) loopRPCReadCHanMsg(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			a.logger.Errorf("App APIReadCHanMsg Routine panic ", string(debug.Stack()))
+			logger.Errorf("App APIReadCHanMsg Routine panic ", string(debug.Stack()))
 		}
 	}()
 	for {
@@ -428,7 +423,7 @@ func (a *App) loopRPCReadCHanMsg(ctx context.Context) {
 func (a *App) loopAPIReadCHanMsg(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			a.logger.Errorf("App APIReadCHanMsg Routine panic ", string(debug.Stack()))
+			logger.Errorf("App APIReadCHanMsg Routine panic ", string(debug.Stack()))
 		}
 	}()
 	for {
@@ -447,7 +442,7 @@ func (a *App) loopAPIReadCHanMsg(ctx context.Context) {
 func (a *App) loopReadChanMsg(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			a.logger.Errorf("App Read Routine panic ", string(debug.Stack()))
+			logger.Errorf("App Read Routine panic ", string(debug.Stack()))
 		}
 	}()
 	for {
@@ -488,16 +483,14 @@ func (a *App) Done() {
 		if a.exDetect != nil {
 			a.exDetect.Done()
 		}
-		if a.logger != nil {
-			a.logger.Done()
-		}
+		logger.Done()
 
 	}
 }
 func (a *App) rpcGoRouinteHandler(pack IPack, handlerFuncs []HandlerFunc) {
 	defer func() {
 		if r := recover(); r != nil {
-			a.logger.Errorf("App RPC receive IPack routine panic ", string(debug.Stack()))
+			logger.Errorf("App RPC receive IPack routine panic ", string(debug.Stack()))
 		}
 		// runtine number -1
 		<-a.runRoutineChan
@@ -508,7 +501,7 @@ func (a *App) rpcGoRouinteHandler(pack IPack, handlerFuncs []HandlerFunc) {
 	go func(ctx context.Context, finishChan chan<- bool, handlerFuncs []HandlerFunc, pack IPack) {
 		defer func() {
 			if r := recover(); r != nil {
-				a.logger.Errorf("App handle RPC callback  routine panic ", string(debug.Stack()))
+				logger.Errorf("App handle RPC callback  routine panic ", string(debug.Stack()))
 			}
 			// runtine number -1
 			<-a.runRoutineChan
@@ -558,7 +551,7 @@ func (a *App) callRPCHandlers(pack IPack) {
 		if respChan != nil {
 			respChan <- pack
 		} else {
-			a.logger.Errorf("App handle RPC Respon callback  routine  %v ", pack)
+			logger.Errorf("App handle RPC Respon callback  routine  %v ", pack)
 		}
 	} else if len(pack.GetRouter()) > 0 {
 		if handler, ok := a.rpcRouters[pack.GetRouter()]; ok && handler != nil && len(handler.Funcs) > 0 {
@@ -574,7 +567,7 @@ func (a *App) callRPCHandlers(pack IPack) {
 				a.rpcResultPack(pack)
 			}
 		} else {
-			a.logger.Errorf("App  RPCHandlers NO  router  %s   please add  handler", pack.GetRouter())
+			logger.Errorf("App  RPCHandlers NO  router  %s   please add  handler", pack.GetRouter())
 		}
 	}
 
@@ -583,7 +576,7 @@ func (a *App) callRPCHandlers(pack IPack) {
 func (a *App) apiGoRouinteHandler(pack IPack, handlerFuncs []HandlerFunc) {
 	defer func() {
 		if r := recover(); r != nil {
-			a.logger.Errorf("App receive IPack routine panic ", string(debug.Stack()))
+			logger.Errorf("App receive IPack routine panic ", string(debug.Stack()))
 		}
 		// runtine number -1
 		<-a.runRoutineChan
@@ -594,7 +587,7 @@ func (a *App) apiGoRouinteHandler(pack IPack, handlerFuncs []HandlerFunc) {
 	go func(ctx context.Context, finishChan chan<- bool, handlerFuncs []HandlerFunc, pack IPack) {
 		defer func() {
 			if r := recover(); r != nil {
-				a.logger.Errorf("App handle api callback  routine panic ", string(debug.Stack()))
+				logger.Errorf("App handle api callback  routine panic ", string(debug.Stack()))
 			}
 			// runtine number -1
 			<-a.runRoutineChan
@@ -614,7 +607,7 @@ func (a *App) apiGoRouinteHandler(pack IPack, handlerFuncs []HandlerFunc) {
 		return
 	case <-ctx.Done():
 		// timeOut
-		a.logger.Errorf("App callAPIHandlers   timeout  %v ", pack)
+		logger.Errorf("App callAPIHandlers   timeout  %v ", pack)
 		a.ErrorToConnector(pack.GetSession(), gnError.ErrAPIHandleTimeOutCode, gnError.ErrAPIHandleTimeOut.Error())
 		panic(gnError.ErrAPIHandleTimeOut)
 	}
@@ -669,7 +662,7 @@ func (a *App) callAPIHandlers(pack IPack) {
 				a.apiResultPack(pack)
 			}
 		} else {
-			a.logger.Errorf("App API RECALL  router  %s  handler is nil ", pack.GetRouter())
+			logger.Errorf("App API RECALL  router  %s  handler is nil ", pack.GetRouter())
 			a.ErrorToConnector(pack.GetSession(), gnError.ErrAPIHandleTimeOutCode, gnError.ErrAPINOHandle.Error())
 		}
 	}
@@ -690,7 +683,7 @@ func (a *App) ErrorToConnector(session *Session, code string, errorMsg string) {
 
 	out, err := jsonI.Marshal(packResponse)
 	if err != nil {
-		a.logger.Errorf("app ErrorToConnector  jsonI.Marshal  err  ", err)
+		logger.Errorf("app ErrorToConnector  jsonI.Marshal  err  ", err)
 		return
 	}
 	a.PushMsg(session, out)

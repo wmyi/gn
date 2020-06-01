@@ -4,7 +4,7 @@ import (
 	"context"
 	"runtime/debug"
 
-	"github.com/wmyi/gn/glog"
+	logger "github.com/wmyi/gn/glog"
 )
 
 type ExceptionHandleFunc func(exception *GnException)
@@ -13,15 +13,13 @@ type GnExceptionDetect struct {
 	isRuning          bool
 	exceptionChan     chan *GnException
 	detectRoutineCanl context.CancelFunc
-	logger            *glog.Glogger
 	exceptionHandlers []ExceptionHandleFunc
 }
 
-func NewGnExceptionDetect(log *glog.Glogger) *GnExceptionDetect {
+func NewGnExceptionDetect() *GnExceptionDetect {
 	return &GnExceptionDetect{
 		isRuning:          false,
 		exceptionChan:     make(chan *GnException, 1<<9),
-		logger:            log,
 		exceptionHandlers: make([]ExceptionHandleFunc, 0, 1<<5),
 	}
 }
@@ -57,7 +55,7 @@ func (ge *GnExceptionDetect) ThrowException(exception *GnException) {
 func (ge *GnExceptionDetect) loopDetectException(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			ge.logger.Errorf("GnExceptionDetect loopRoutine ", string(debug.Stack()))
+			logger.Errorf("GnExceptionDetect loopRoutine ", string(debug.Stack()))
 		}
 	}()
 	for {
@@ -65,7 +63,7 @@ func (ge *GnExceptionDetect) loopDetectException(ctx context.Context) {
 			if data, ok := <-ge.exceptionChan; ok && data != nil {
 				ge.callBackhandler(data)
 			} else {
-				ge.logger.Errorf("expceptionChan  channel <- error  ")
+				logger.Errorf("expceptionChan  channel <- error  ")
 				panic(ErrExceptionDetectChan)
 			}
 		} else {
@@ -76,7 +74,7 @@ func (ge *GnExceptionDetect) loopDetectException(ctx context.Context) {
 				if ok && data != nil {
 					ge.callBackhandler(data)
 				} else {
-					ge.logger.Errorf("expceptionChan  channel <- error  ")
+					logger.Errorf("expceptionChan  channel <- error  ")
 					panic(ErrExceptionDetectChan)
 				}
 			}

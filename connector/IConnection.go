@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/wmyi/gn/config"
-	"github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 	"github.com/wmyi/gn/linker"
 )
@@ -37,7 +36,6 @@ type IConnector interface {
 	LoopLinkerChan(ctx context.Context)
 	ListenAndRun() error
 	GetLinker() linker.ILinker
-	GetLoger() *glog.Glogger
 	SendPack(serverAddress, router, bindId, cid string, data []byte)
 	GetServerIdByRouter(serverType string, LogicBindId string, cid string, serverList []*config.ServersConfig) string
 }

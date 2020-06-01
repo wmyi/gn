@@ -4,7 +4,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/wmyi/gn/config"
-	"github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 	"github.com/wmyi/gn/linker"
 )
@@ -41,7 +40,6 @@ type IPack interface {
 	GetReplyToken() string
 	GetDstSubRouter() string
 	GetSrcSubRouter() string
-	GetLogger() *glog.Glogger
 	GetBindId() string
 	SetRPCRespCode(code int)
 	GetRPCRespCode() int32
@@ -81,7 +79,6 @@ type IApp interface {
 
 	Done()
 	GetServerConfig() *config.Config
-	GetLogger() *glog.Glogger
 	Run() error
 
 	AddExceptionHandler(handler gnError.ExceptionHandleFunc)

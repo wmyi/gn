@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/wmyi/gn/config"
-	"github.com/wmyi/gn/glog"
+	logger "github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 	"github.com/wmyi/gn/linker"
 
@@ -45,7 +45,6 @@ type Connector struct {
 	config       *config.Config
 
 	rearEndHandles    map[string]RouteRearEndHFunc
-	logger            *glog.Glogger
 	cmdMaster         gn.IAppCmd
 	exDetect          *gnError.GnExceptionDetect
 	checkOriginHand   CheckOriginHFunc
@@ -73,9 +72,7 @@ func (c *Connector) Done() {
 		if c.exDetect != nil {
 			c.exDetect.Done()
 		}
-		if c.logger != nil {
-			c.Done()
-		}
+		logger.Done()
 		c.cms.Range(func(key, value interface{}) bool {
 			if ws, ok := value.(WSConnection); ok {
 				ws.Done()
@@ -111,10 +108,10 @@ func (c *Connector) SendPack(serverAddress, router, bindId, cid string, data []b
 		}
 		out, err := proto.Marshal(pack)
 		if err == nil {
-			c.logger.Infof("connector  SendPack  serverAddress   %v   Msg  %v  ", serverAddress, out)
+			logger.Infof("connector  SendPack  serverAddress   %v   Msg  %v  ", serverAddress, out)
 			c.LinkerClient.SendMsg(serverAddress, out)
 		} else {
-			c.logger.Errorf("connector  SendPack Marshal Pb  errr   %v  ", err)
+			logger.Errorf("connector  SendPack Marshal Pb  errr   %v  ", err)
 		}
 	}
 
@@ -122,12 +119,12 @@ func (c *Connector) SendPack(serverAddress, router, bindId, cid string, data []b
 
 func (c *Connector) decodeClientPack(pack *ChanMsgPack) error {
 
-	c.logger.Infof("connector- client Pack bindId  %s   receive   %v  ", pack.logicBindID, string(pack.body))
+	logger.Infof("connector- client Pack bindId  %s   receive   %v  ", pack.logicBindID, string(pack.body))
 	var mapData map[string]interface{}
 	// unmarshal  json
 	err := jsonI.Unmarshal(pack.body, &mapData)
 	if err != nil {
-		c.logger.Errorf("connector receive  Msg   Unmarshal  err   %v  ", err)
+		logger.Errorf("connector receive  Msg   Unmarshal  err   %v  ", err)
 		// return  to client
 		c.ErrorToClient(pack.cid, gnError.ErrPackWrongFormat, "pack format wrong json  please check ")
 		return gnError.ErrCUnmarshalClientPack
@@ -135,7 +132,7 @@ func (c *Connector) decodeClientPack(pack *ChanMsgPack) error {
 	if routerS, ok := mapData["router"]; ok {
 		if router, ok := routerS.(string); ok {
 			routers := strings.Split(router, ".")
-			c.logger.Infof("connector-   router    %v \n ", routers)
+			logger.Infof("connector-   router    %v \n ", routers)
 			if len(routers) > 1 {
 
 				// calculate end serverAddress
@@ -154,18 +151,18 @@ func (c *Connector) decodeClientPack(pack *ChanMsgPack) error {
 					}
 					out, err := proto.Marshal(pack)
 					if err == nil {
-						c.logger.Infof("connector  send  serverAddress   %v   Msg  %v  ", serverAddress, out)
+						logger.Infof("connector  send  serverAddress   %v   Msg  %v  ", serverAddress, out)
 						c.LinkerClient.SendMsg(serverAddress, out)
 					} else {
-						c.logger.Errorf("connector  send Marshal Pb  errr   %v  ", err)
+						logger.Errorf("connector  send Marshal Pb  errr   %v  ", err)
 						return gnError.ErrCmarshalPbPack
 					}
 				} else {
 					c.ErrorToClient(pack.cid, gnError.ErrRouter, "please check router  format")
-					c.logger.Infof("connector- recve cid  %s  msg  %v   route fail  please check route \n", pack.cid, string(pack.body))
+					logger.Infof("connector- recve cid  %s  msg  %v   route fail  please check route \n", pack.cid, string(pack.body))
 				}
 			} else {
-				c.logger.Infof("recve  router  error      %v   ", router)
+				logger.Infof("recve  router  error      %v   ", router)
 				c.ErrorToClient(pack.cid, gnError.ErrRouter, "please check router  format")
 			}
 		} else {
@@ -181,7 +178,7 @@ func (c *Connector) decodeClientPack(pack *ChanMsgPack) error {
 func (c *Connector) LoopClientReadChan(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			c.logger.Errorf("connector Read Routine panic ", string(debug.Stack()))
+			logger.Errorf("connector Read Routine panic ", string(debug.Stack()))
 		}
 	}()
 	for {
@@ -205,7 +202,7 @@ func (c *Connector) ErrorToClient(cid string, code string, errorMsg string) {
 	if c.CRChan != nil {
 		out, err := jsonI.Marshal(packResponse)
 		if err != nil {
-			c.logger.Errorf("connector ErrorToClient  jsonI.Marshal  err  ", err)
+			logger.Errorf("connector ErrorToClient  jsonI.Marshal  err  ", err)
 			return
 		}
 
@@ -215,7 +212,7 @@ func (c *Connector) ErrorToClient(cid string, code string, errorMsg string) {
 		}
 		packOut, err := proto.Marshal(pack)
 		if err != nil {
-			c.logger.Errorf("connector ErrorToClient  proto.Marshal  err  ", err)
+			logger.Errorf("connector ErrorToClient  proto.Marshal  err  ", err)
 			return
 		}
 		c.CWChan <- packOut
@@ -246,10 +243,10 @@ func (c *Connector) AddRouterRearEndHandler(serverType string, handler RouteRear
 func (c *Connector) decodeRearEndPbPack(data []byte) error {
 	if len(data) > 0 {
 		dTsession := &config.TSession{}
-		c.logger.Infof(" connector  RearEnd receive msg      %v ", string(data))
+		logger.Infof(" connector  RearEnd receive msg      %v ", string(data))
 		err := proto.Unmarshal(data, dTsession)
 		if err != nil {
-			c.logger.Errorf("connector  RearEnd msg  UnMarshal err   %v ", err)
+			logger.Errorf("connector  RearEnd msg  UnMarshal err   %v ", err)
 			return gnError.ErrCUnmarshalPbPack
 		}
 
@@ -282,7 +279,7 @@ func (c *Connector) GetLinker() linker.ILinker {
 func (c *Connector) LoopLinkerChan(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			c.logger.Errorf("connector receive Nats routine panic ", string(debug.Stack()))
+			logger.Errorf("connector receive Nats routine panic ", string(debug.Stack()))
 		}
 	}()
 	for {
@@ -304,7 +301,7 @@ func (c *Connector) ListenAndRun() error {
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		// verifyClientConnect
 		if c.verifyConnectHand != nil && !c.verifyConnectHand(r) {
-			c.logger.Infof(" ws  connector verify fail  url  %v", r.RequestURI)
+			logger.Infof(" ws  connector verify fail  url  %v", r.RequestURI)
 			return
 		}
 		// init wsUpgrader
@@ -321,24 +318,24 @@ func (c *Connector) ListenAndRun() error {
 		}
 		wsConn, err := c.wsUpgrader.Upgrade(w, r, nil)
 		if err != nil {
-			c.logger.Errorln(err)
+			logger.Errorln(err)
 
 			return
 		}
 		// create connection
-		client := NewWSConnection(wsConn, c.CRChan, c.logger, c.exDetect)
+		client := NewWSConnection(wsConn, c.CRChan, c.exDetect)
 		uuid := client.GetConnectionCid()
 		if len(uuid) > 0 {
 			c.cms.Store(uuid, client)
 			client.Run()
-			c.logger.Infof("connector new  connection uuid    %s ", uuid)
+			logger.Infof("connector new  connection uuid    %s ", uuid)
 		} else {
-			c.logger.Errorln("connector   connection uuid     %s ")
+			logger.Errorln("connector   connection uuid     %s ")
 		}
 	})
 	var host string = c.config.GetConConfByServerId(serverId).Host + ":" + strconv.Itoa(c.config.GetConConfByServerId(serverId).ClientPort)
 	if err := http.ListenAndServe(host, nil); err != nil {
-		c.logger.Infof("http ListenAndServe  error %v", err)
+		logger.Infof("http ListenAndServe  error %v", err)
 		return err
 	}
 	return nil
@@ -362,12 +359,12 @@ func (c *Connector) Run() error {
 		// nats  connection
 		err := c.LinkerClient.Run()
 		if err != nil {
-			c.logger.Errorf("natsLinker Run error  %v", err)
+			logger.Errorf("natsLinker Run error  %v", err)
 			return err
 		}
 		err = c.cmdMaster.Run()
 		if err != nil {
-			c.logger.Errorf("cmdApp Run error  %v", err)
+			logger.Errorf("cmdApp Run error  %v", err)
 			return err
 		}
 		rctx, rcancal := context.WithCancel(context.Background())
@@ -384,7 +381,7 @@ func (c *Connector) Run() error {
 		// listen http
 		return c.ListenAndRun()
 	} else {
-		c.logger.Errorf("connector is aleady Runing ")
+		logger.Errorf("connector is aleady Runing ")
 		return gnError.ErrConnectorRuning
 	}
 
@@ -417,16 +414,12 @@ func DefaultConnector(config *config.Config) (IConnector, error) {
 			rearEndHandles: make(map[string]RouteRearEndHFunc, 8),
 			isRuning:       false,
 		}
-		instance.logger = glog.NewLogger(config, serverId, mode)
-		instance.exDetect = gnError.NewGnExceptionDetect(instance.logger)
+		logger.SetConfig(config, serverId, mode)
+		instance.exDetect = gnError.NewGnExceptionDetect()
 
 		instance.LinkerClient = linker.NewNatsClient(config.GetConConfByServerId(serverId).ID, &config.Natsconf,
-			instance.CWChan, instance.logger, instance.exDetect)
-		instance.cmdMaster = gn.NewAppCmd(instance.logger, instance.LinkerClient, instance.exDetect)
+			instance.CWChan, instance.exDetect)
+		instance.cmdMaster = gn.NewAppCmd(instance.LinkerClient, instance.exDetect)
 	})
 	return instance, nil
-}
-
-func (c *Connector) GetLoger() *glog.Glogger {
-	return c.logger
 }

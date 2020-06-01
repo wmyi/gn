@@ -3,7 +3,6 @@ package master
 import (
 	"runtime"
 
-	"github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 )
 
@@ -19,5 +18,4 @@ type IMaster interface {
 	Done()
 	GetNodeInfos() map[string]*NodeInfo
 	AddExceptionHandler(handler gnError.ExceptionHandleFunc)
-	GetLogger() *glog.Glogger
 }

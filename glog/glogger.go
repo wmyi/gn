@@ -1,6 +1,7 @@
 package glog
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -16,36 +17,48 @@ const (
 	LevelWarn
 	LevelDebug
 	LevelError
-	LevelPanic
-	LevelFatal
 )
 
 var (
+	glogRef      *Glogger
+	once         sync.Once
 	logLevelInfo = map[string]int{
 		"All":   0,
 		"Info":  1,
 		"Warn":  2,
 		"Debug": 3,
 		"Error": 4,
-		"Panic": 5,
-		"Fatal": 6,
 	}
 )
 
-func NewLogger(conf *config.Config, serverId, mode string) *Glogger {
-	if conf != nil && len(serverId) > 0 {
-		log := &Glogger{
-			logConf:     &conf.LogConf,
-			curServerId: serverId,
-			mode:        mode,
-		}
-		log.initLogFile()
-		return log
+func SetConfig(conf *config.Config, serverId, mode string) {
+	if glogRef == nil {
+		glogInit()
 	}
-	return nil
+	if conf != nil && len(serverId) > 0 {
+		glogRef.logConf = &conf.LogConf
+		glogRef.curServerId = serverId
+		glogRef.mode = mode
+	}
+	glogRef.initLogFile()
 }
 
-func IsFileExist(fileName string) (error, bool, int64) {
+func glogInit() {
+	if glogRef == nil {
+		once.Do(func() {
+			glogRef = &Glogger{
+				logsChan: make(chan string, 1<<10),
+				IsRuning: false,
+			}
+			ctx, cancal := context.WithCancel(context.Background())
+			go loopChanToFile(ctx, glogRef)
+			glogRef.logsChanCacal = cancal
+			glogRef.IsRuning = true
+		})
+	}
+}
+
+func isFileExist(fileName string) (error, bool, int64) {
 	file, err := os.Stat(fileName)
 	if err == nil {
 		return nil, true, file.Size()
@@ -56,16 +69,45 @@ func IsFileExist(fileName string) (error, bool, int64) {
 	return err, false, 0
 }
 
+func loopChanToFile(ctx context.Context, gl *Glogger) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case log, ok := <-gl.logsChan:
+			if ok && len(log) > 0 && gl != nil {
+				gl.output(log)
+			}
+		}
+
+	}
+}
+
+func Done() {
+	if glogRef != nil && glogRef.IsRuning {
+		if glogRef.logsChanCacal != nil {
+			glogRef.logsChanCacal()
+		}
+		if glogRef.logFile != nil {
+			glogRef.logFile.Close()
+		}
+		glogRef.IsRuning = false
+		glogRef = nil
+	}
+}
+
 type Glogger struct {
-	log         *Logger
-	logConf     *config.LogConfig
-	logFile     *os.File
-	curServerId string
-	currentSize int64
-	fileName    string
-	basePath    string
-	rollingLock sync.RWMutex
-	mode        string
+	log           *Logger
+	logConf       *config.LogConfig
+	logFile       *os.File
+	curServerId   string
+	currentSize   int64
+	fileName      string
+	basePath      string
+	mode          string
+	logsChan      chan string
+	logsChanCacal context.CancelFunc
+	IsRuning      bool
 }
 
 func (l *Glogger) initLogFile() {
@@ -82,14 +124,14 @@ func (l *Glogger) initLogFile() {
 	l.basePath = path.Join(wdPath, "../../logs/")
 	l.fileName = path.Join(l.basePath, l.curServerId+".log")
 	// dir
-	if _, exist, _ := IsFileExist(l.basePath); exist == false {
+	if _, exist, _ := isFileExist(l.basePath); exist == false {
 		err = os.MkdirAll(l.basePath, os.ModePerm)
 		if err != nil {
 			panic(err)
 		}
 	}
 	// log file
-	if _, exist, size := IsFileExist(l.fileName); exist == true {
+	if _, exist, size := isFileExist(l.fileName); exist == true {
 		l.currentSize = size
 	} else {
 		l.currentSize = 0
@@ -100,15 +142,17 @@ func (l *Glogger) initLogFile() {
 		panic(err)
 	}
 	l.log = NewLog(io.MultiWriter(l.logFile), "[gn] ", log.Ldate|log.Lmicroseconds|log.Lshortfile)
-
 }
 
-func (l *Glogger) Output(level string, isLn bool, format string, v ...interface{}) {
+func (l *Glogger) logAssembleStr(level string, isLn bool, format string, v ...interface{}) {
 	configLevel, ok := logLevelInfo[l.logConf.Level]
 	if !ok {
 		configLevel = logLevelInfo["All"]
 	}
 	if inputLevel, _ := logLevelInfo[level]; configLevel > inputLevel {
+		return
+	}
+	if l.logsChan == nil {
 		return
 	}
 	var s string
@@ -117,44 +161,41 @@ func (l *Glogger) Output(level string, isLn bool, format string, v ...interface{
 	} else {
 		s = fmt.Sprintf(format, v...)
 	}
-	var sLen int = 0
+
 	switch level {
 	case "Info":
-		sLen, _ = l.log.Println("[Info] ", s)
+		l.logsChan <- "[Info] " + s
 	case "Warn":
-		sLen, _ = l.log.Println("[Warn] ", s)
+		l.logsChan <- "[Warn] " + s
 	case "Debug":
-		sLen, _ = l.log.Println("[Debug] ", s)
+		l.logsChan <- "[Debug] " + s
 	case "Error":
-		sLen, _ = l.log.Println("[Error] ", s)
-	case "Panic":
-		sLen, _ = l.log.Panicln("[Panic] ", s)
-		panic(s)
-	case "Fatal":
-		sLen, _ = l.log.Fatalln("[Fatal] ", s)
-		os.Exit(1)
+		l.logsChan <- "[Error] " + s
 	}
+
+}
+
+func (l *Glogger) output(s string) {
+	if l.log == nil {
+		l.log = NewLog(io.MultiWriter(os.Stdout), "[gn] ", log.Ldate|log.Ltime|log.Lshortfile)
+	}
+
+	var sLen int = 0
+	if l.log != nil {
+		sLen, _ = l.log.Println(s)
+	}
+	l.currentSize += int64(sLen)
 	// mode  debug   return
 	if len(l.mode) > 0 && l.mode == "debug" {
 		return
 	}
-	l.rollingLock.Lock()
-	defer l.rollingLock.Unlock()
-	l.currentSize += int64(sLen)
 	// fmt.Println(" l.currentSize  %d   maxSize   %d", l.currentSize, l.logConf.MaxLogSize)
 	if l.currentSize >= l.logConf.MaxLogSize {
-		l.RollingFile()
-	}
-
-}
-
-func (l *Glogger) Done() {
-	if l.logFile != nil {
-		l.logFile.Close()
+		l.rollingFile()
 	}
 }
 
-func (l *Glogger) RollingFile() {
+func (l *Glogger) rollingFile() {
 
 	fname := ""
 	num := l.logConf.NumBackups - 1
@@ -183,48 +224,57 @@ func (l *Glogger) RollingFile() {
 	l.currentSize = 0
 }
 
-func (l *Glogger) Infof(format string, v ...interface{}) {
-	l.Output("Info", false, format, v...)
+func Infof(format string, v ...interface{}) {
+	if glogRef == nil {
+		glogInit()
+	}
+	glogRef.logAssembleStr("Info", false, format, v...)
 }
 
-func (l *Glogger) Infoln(v ...interface{}) {
-	l.Output("Info", true, "", v...)
+func Infoln(v ...interface{}) {
+	if glogRef == nil {
+		glogInit()
+	}
+	glogRef.logAssembleStr("Info", true, "", v...)
 }
 
-func (l *Glogger) Warnf(format string, v ...interface{}) {
-	l.Output("Warn", false, format, v...)
+func Warnf(format string, v ...interface{}) {
+	if glogRef == nil {
+		glogInit()
+	}
+	glogRef.logAssembleStr("Warn", false, format, v...)
 }
-func (l *Glogger) Warnln(v ...interface{}) {
-	l.Output("Warn", true, "", v...)
-}
-
-func (l *Glogger) Debugf(format string, v ...interface{}) {
-	l.Output("Debug", false, format, v...)
-}
-
-func (l *Glogger) Debugln(v ...interface{}) {
-	l.Output("Debug", true, "", v...)
+func Warnln(v ...interface{}) {
+	if glogRef == nil {
+		glogInit()
+	}
+	glogRef.logAssembleStr("Warn", true, "", v...)
 }
 
-func (l *Glogger) Errorf(format string, v ...interface{}) {
-	l.Output("Error", false, format, v...)
+func Debugf(format string, v ...interface{}) {
+	if glogRef == nil {
+		glogInit()
+	}
+	glogRef.logAssembleStr("Debug", false, format, v...)
 }
 
-func (l *Glogger) Errorln(v ...interface{}) {
-	l.Output("Error", true, "", v...)
+func Debugln(v ...interface{}) {
+	if glogRef == nil {
+		glogInit()
+	}
+	glogRef.logAssembleStr("Debug", true, "", v...)
 }
 
-func (l *Glogger) Panicf(format string, v ...interface{}) {
-	l.Output("Panic", false, format, v...)
+func Errorf(format string, v ...interface{}) {
+	if glogRef == nil {
+		glogInit()
+	}
+	glogRef.logAssembleStr("Error", false, format, v...)
 }
 
-func (l *Glogger) Panicln(v ...interface{}) {
-	l.Output("Panic", true, "", v...)
-}
-
-func (l *Glogger) fatalf(format string, v ...interface{}) {
-	l.Output("Fatal", false, format, v...)
-}
-func (l *Glogger) fatalln(v ...interface{}) {
-	l.Output("Fatal", true, "", v...)
+func Errorln(v ...interface{}) {
+	if glogRef == nil {
+		glogInit()
+	}
+	glogRef.logAssembleStr("Error", true, "", v...)
 }

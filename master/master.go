@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/wmyi/gn/glog"
+	logger "github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 	"github.com/wmyi/gn/linker"
 
@@ -36,7 +36,6 @@ const (
 type Master struct {
 	config           *config.Config
 	links            linker.ILinker
-	Logger           *glog.Glogger
 	serverMap        map[string]*NodeInfo
 	inChan           chan []byte
 	isRunning        bool
@@ -68,8 +67,8 @@ func DefaultMaster(conf *config.Config) (IMaster, error) {
 		}
 
 		masterConf := conf.GetMasterConf()
-		mInstance.Logger = glog.NewLogger(conf, "master", mode)
-		mInstance.exDetect = gnError.NewGnExceptionDetect(mInstance.Logger)
+		logger.SetConfig(conf, "master", mode)
+		mInstance.exDetect = gnError.NewGnExceptionDetect()
 		if masterConf != nil {
 			mInstance.links = linker.NewNatsClient(masterConf.ID, &conf.Natsconf, mInstance.inChan, mInstance.Logger,
 				mInstance.exDetect)
@@ -85,7 +84,7 @@ func (m *Master) Run() error {
 
 		err := m.links.Run()
 		if err != nil {
-			m.Logger.Errorf("Master Run error  %v", err)
+			logger.Errorf("Master Run error  %v", err)
 			return err
 		}
 
@@ -109,11 +108,11 @@ func (m *Master) PingHandler(cmd, nodeId string, date []byte) {
 		nodeInfo := &config.CmdMsg{}
 		err := proto.Unmarshal(date, nodeInfo)
 		if err != nil {
-			m.Logger.Errorf("master  receive CMD_PING  proto.Unmarshal error ", err)
+			logger.Errorf("master  receive CMD_PING  proto.Unmarshal error ", err)
 			return
 		}
 		value.RoutineNum = nodeInfo.GetRunRoutineNum()
-		m.Logger.Infof(" pingHandler  cmd  %s   nodeId  %s info  %v ", cmd, nodeId, value)
+		logger.Infof(" pingHandler  cmd  %s   nodeId  %s info  %v ", cmd, nodeId, value)
 	}
 
 }
@@ -156,10 +155,10 @@ func (m *Master) checkNotifyNodeInfo() {
 				pack := m.newCMDPack(NODE_NAME, nodeConf.ID, config.CMD_PING, nil, "")
 				out, err := proto.Marshal(pack)
 				if err == nil {
-					m.Logger.Infof("master  checkNotifyNodeInfo send   serverAddress     %v   Msg  %v \n ", nodeConf.ID, out)
+					logger.Infof("master  checkNotifyNodeInfo send   serverAddress     %v   Msg  %v \n ", nodeConf.ID, out)
 					m.links.SendMsg(nodeConf.ID, out)
 				} else {
-					m.Logger.Errorf("master receive  pb Marshal  errr     %v  ", err)
+					logger.Errorf("master receive  pb Marshal  errr     %v  ", err)
 				}
 
 			}
@@ -174,10 +173,10 @@ func (m *Master) checkNotifyNodeInfo() {
 				pack := m.newCMDPack(NODE_NAME, nodeConf.ID, config.CMD_PING, nil, "")
 				out, err := proto.Marshal(pack)
 				if err == nil {
-					m.Logger.Infof("master   send  init serverAddress     %v   Msg  %v \n ", nodeConf.ID, out)
+					logger.Infof("master   send  init serverAddress     %v   Msg  %v \n ", nodeConf.ID, out)
 					m.links.SendMsg(nodeConf.ID, out)
 				} else {
-					m.Logger.Errorf("master receive  pb Marshal  errr     %v  ", err)
+					logger.Errorf("master receive  pb Marshal  errr     %v  ", err)
 				}
 
 			}
@@ -189,7 +188,7 @@ func (m *Master) checkNotifyNodeInfo() {
 func (m *Master) loopNatsChanMsg(ctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
-			m.Logger.Errorf("master   Read stop error ", string(debug.Stack()))
+			logger.Errorf("master   Read stop error ", string(debug.Stack()))
 		}
 	}()
 	for {
@@ -206,7 +205,7 @@ func (m *Master) loopNatsChanMsg(ctx context.Context) {
 				dTsession := &config.TSession{}
 				err := proto.Unmarshal(data, dTsession)
 				if err != nil {
-					m.Logger.Infof("  master in receive msg  UnMarsha err   %v ", err)
+					logger.Infof("  master in receive msg  UnMarsha err   %v ", err)
 				}
 
 				if len(dTsession.GetRouter()) > 0 && len(dTsession.GetSrcSubRouter()) > 0 {
@@ -270,10 +269,10 @@ func (m *Master) SendCMD(cmd, nodeId string, data []byte) (result []byte, err er
 		pack := m.newCMDPack(NODE_NAME, nodeId, cmd, data, requestId)
 		out, err := proto.Marshal(pack)
 		if err == nil {
-			m.Logger.Infof("master  send ping  serverAddress     %v   Msg  %v \n ", nodeId, out)
+			logger.Infof("master  send ping  serverAddress     %v   Msg  %v \n ", nodeId, out)
 			m.links.SendMsg(nodeId, out)
 		} else {
-			m.Logger.Errorf("master send ping recve  pb Marshal  errr     %v  ", err)
+			logger.Errorf("master send ping recve  pb Marshal  errr     %v  ", err)
 		}
 
 		var timed = time.NewTimer(time.Duration(30) * time.Second)
@@ -315,10 +314,10 @@ func (m *Master) checkNodeTimeOut() {
 		pack := m.newCMDPack(NODE_NAME, ID, config.CMD_PING, nil, "")
 		out, err := proto.Marshal(pack)
 		if err == nil {
-			m.Logger.Infof("master  send ping  serverAddress     %v   Msg  %v \n ", ID, out)
+			logger.Infof("master  send ping  serverAddress     %v   Msg  %v \n ", ID, out)
 			m.links.SendMsg(ID, out)
 		} else {
-			m.Logger.Errorf("master send ping recve  pb Marshal  errr     %v  ", err)
+			logger.Errorf("master send ping recve  pb Marshal  errr     %v  ", err)
 		}
 	}
 
@@ -335,10 +334,6 @@ func (m *Master) Done() {
 		m.isRunning = false
 	}
 
-}
-
-func (m *Master) GetLogger() *glog.Glogger {
-	return m.Logger
 }
 
 func (m *Master) AddExceptionHandler(handler gnError.ExceptionHandleFunc) {

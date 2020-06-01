@@ -8,7 +8,7 @@ import (
 	"context"
 
 	"github.com/wmyi/gn/config"
-	"github.com/wmyi/gn/glog"
+	logger "github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
 	"github.com/wmyi/gn/linker"
 
@@ -22,11 +22,10 @@ type IAppCmd interface {
 	Done()
 }
 
-func NewAppCmd(loger *glog.Glogger, nlinks linker.ILinker, detect *gnError.GnExceptionDetect) IAppCmd {
+func NewAppCmd(nlinks linker.ILinker, detect *gnError.GnExceptionDetect) IAppCmd {
 	return &AppCmd{
 		cmdHandlers: make(map[string]HandlerFunc, 1<<4),
 		inChan:      make(chan IPack, 1<<4),
-		logger:      loger,
 		links:       nlinks,
 		isRuning:    false,
 		exDetect:    detect,
@@ -37,7 +36,6 @@ type AppCmd struct {
 	cmdHandlers map[string]HandlerFunc
 	inChan      chan IPack
 	links       linker.ILinker
-	logger      *glog.Glogger
 	inCancal    context.CancelFunc
 	handleMutex sync.RWMutex
 	isRuning    bool
@@ -55,7 +53,7 @@ func (ap *AppCmd) Run() error {
 		ap.isRuning = false
 		return nil
 	} else {
-		ap.logger.Errorf(" appCmd  componentis aleady Runing ")
+		logger.Errorf(" appCmd  componentis aleady Runing ")
 		return gnError.ErrAPPCMDMRuning
 	}
 
@@ -79,7 +77,7 @@ func (ap *AppCmd) MemHandler(pack IPack) {
 		runtime.ReadMemStats(memSet)
 		data, err := jsonI.Marshal(memSet)
 		if err != nil {
-			ap.logger.Errorf("AppCmd  receive CMD_MEM  Json Marshal error ", err)
+			logger.Errorf("AppCmd  receive CMD_MEM  Json Marshal error ", err)
 			return
 		}
 		pack.ResultBytes(data)
@@ -90,7 +88,7 @@ func (ap *AppCmd) LoopCmdInChan(ctx context.Context) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			ap.logger.Errorf("AppCmd  LoopCmdInChan  go   %v", string(debug.Stack()))
+			logger.Errorf("AppCmd  LoopCmdInChan  go   %v", string(debug.Stack()))
 		}
 	}()
 	for {
@@ -125,7 +123,7 @@ func (ap *AppCmd) handlePack(pack IPack) {
 			if err == nil {
 				ap.links.SendMsg(replyPack.GetDstSubRouter(), out)
 			} else {
-				ap.logger.Infof(" AppCmd  pb Marshal  errr     %v  ", err)
+				logger.Infof(" AppCmd  pb Marshal  errr     %v  ", err)
 			}
 		}
 	}
