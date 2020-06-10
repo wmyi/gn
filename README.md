@@ -12,12 +12,12 @@
 # GN 特点以及简介
 ## 1: handler API 
 GN可以根据自己后端API需求，轻松简单实现 该API是 单独协程处理业务逻辑，还是公用一个协程排队处理，如：<br>
-``` golang
+```go
 APIRouter(router string, newGoRoutine bool, handlerFunc ...HandlerFunc)
 RPCRouter(router string, newGoRoutine bool, handlerFunc HandlerFunc)
 ```
 使用样例：
-``` golang
+```go
 app.APIRouter("addGroup", true, addGroup)
 app.APIRouter("createGroup", true, createGroup)
 app.RPCRouter("rpcGetAllGroups", false, rpcGetAllGroups)
