@@ -7,7 +7,7 @@
 --------------
 
 # GN 框架图
-![gn](./doc/img/GNFramework.jpg "GNFramework")
+![GNFramework](./doc/img/GNFramework.jpg "GNFramework")
 --------------
 
 # GN 特点以及简介
