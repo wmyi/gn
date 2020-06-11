@@ -7,6 +7,9 @@
 --------------
 
 # GN 框架图
+
+
+	![gn]](http://www.baidu.com/img/bdlogo.gif "GNFramework")
 --------------
 
 # GN 特点以及简介
