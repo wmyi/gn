@@ -70,7 +70,7 @@ func DefaultMaster(conf *config.Config) (IMaster, error) {
 		logger.SetConfig(conf, "master", mode)
 		mInstance.exDetect = gnError.NewGnExceptionDetect()
 		if masterConf != nil {
-			mInstance.links = linker.NewNatsClient(masterConf.ID, &conf.Natsconf, mInstance.inChan, mInstance.Logger,
+			mInstance.links = linker.NewNatsClient(masterConf.ID, &conf.Natsconf, mInstance.inChan,
 				mInstance.exDetect)
 		}
 
