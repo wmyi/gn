@@ -296,6 +296,12 @@ func (c *Connector) LoopLinkerChan(ctx context.Context) {
 
 }
 
+func (c *Connector) CMDHandler(cmd string, handler gn.HandlerFunc) {
+	if c.cmdMaster != nil {
+		c.cmdMaster.AddCmdHandler(cmd, handler)
+	}
+}
+
 func (c *Connector) ListenAndRun() error {
 	// websocket   init
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/wmyi/gn/config"
+	"github.com/wmyi/gn/gn"
 	"github.com/wmyi/gn/gnError"
 	"github.com/wmyi/gn/linker"
 )
@@ -32,6 +33,9 @@ type IConnector interface {
 	// set verify Connect func
 	SetVerifyConnectHandler(handler VerifyClientConnectHFunc)
 	AddExceptionHandler(handler gnError.ExceptionHandleFunc)
+
+	CMDHandler(cmd string, handler gn.HandlerFunc)
+
 	LoopClientReadChan(ctx context.Context)
 	LoopLinkerChan(ctx context.Context)
 	ListenAndRun() error
