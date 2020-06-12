@@ -10,7 +10,7 @@
 ![GNFramework](./doc/img/GNFramework.jpg "GNFramework")
 --------------
 
-# GN 特点以及简介
+# GN 简介
 ## 1: handler API 
 GN可以根据自己后端API需求，轻松简单实现 该API是 单独协程处理业务逻辑，还是公用一个协程排队处理，如：<br>
 ```go
