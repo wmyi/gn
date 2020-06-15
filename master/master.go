@@ -13,6 +13,7 @@ import (
 
 	logger "github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
+	"github.com/wmyi/gn/gnutil"
 	"github.com/wmyi/gn/linker"
 
 	"github.com/wmyi/gn/config"
@@ -259,6 +260,32 @@ func (m *Master) AddHandler(cmd string, handler CmdHandlerFunc) {
 		m.handlesMutex.Unlock()
 	}
 }
+
+func (m *Master) SendCMDJson(cmd, nodeId string, obj interface{}) (result []byte, err error) {
+	if len(cmd) > 0 && len(nodeId) > 0 {
+		out, ok := gnutil.JsonToBytes(obj)
+		if ok && out != nil {
+			return m.SendCMD(cmd, nodeId, out)
+		} else {
+			return nil, gnError.ErrParameter
+		}
+	} else {
+		return nil, gnError.ErrParameter
+	}
+}
+func (m *Master) SendCMDProto(cmd, nodeId string, obj interface{}) (result []byte, err error) {
+	if len(cmd) > 0 && len(nodeId) > 0 {
+		out, ok := gnutil.ProtoBufToBytes(obj)
+		if ok && out != nil {
+			return m.SendCMD(cmd, nodeId, out)
+		} else {
+			return nil, gnError.ErrParameter
+		}
+	} else {
+		return nil, gnError.ErrParameter
+	}
+}
+
 func (m *Master) SendCMD(cmd, nodeId string, data []byte) (result []byte, err error) {
 	if len(cmd) > 0 && len(nodeId) > 0 {
 		requestId := cmd + "-" + strconv.FormatUint(atomic.AddUint64(&onceCMDRequestIdBase, 1), 10)

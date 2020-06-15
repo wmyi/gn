@@ -76,12 +76,16 @@ app.RPCRouter("rpcGetAllGroups", false, rpcGetAllGroups)
 		}
 	})
 ```
-    所有异常 gnError查看
+    所有exception异常 请在gnError包查看
 
 
 ------------
 ## 4:GN master 服务 样例及说明
-#### 目前GN master 模块 并没有 添加 启动以及管理的 子节点的功能，而是简单的添加了  探知各个子节点，ping/pong 
+#### 目前GN master 模块 并没有 增加 启动，重启以及管理的 子节点的功能，而是简单的添加了  探知各个子节点，ping/pong心跳机制，以及master RPC 远程调用  其他子节点的注册函数，返回相应的 信息，以供开发者 获取 子节点对应的 子服务的信息。 例子如下：<br>
+``` go 
+
+
+```
 
 
 ------------
@@ -91,6 +95,12 @@ app.RPCRouter("rpcGetAllGroups", false, rpcGetAllGroups)
 
 ------------
 ## 6: GN Connector 服务 样例及说明
+#### 目前 Gn Connector 中仅仅支持 websocket 连接，并使用 github.com/gorilla/websocket 该包，connector 包中  
+
+
+------------
+
+## 7: Nats 消息中间件服务 说明
 #### 目前 Gn Connector 中仅仅支持 websocket 连接，并使用 github.com/gorilla/websocket 该包，connector 包中  
 
 

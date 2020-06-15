@@ -13,6 +13,8 @@ type IMaster interface {
 	Run() error
 	AddHandler(cmd string, handler CmdHandlerFunc)
 	SendCMD(cmd, nodeId string, data []byte) (result []byte, err error)
+	SendCMDJson(cmd, nodeId string, obj interface{}) (result []byte, err error)
+	SendCMDProto(cmd, nodeId string, obj interface{}) (result []byte, err error)
 	TimeOutServerListListener(tHandler TimeOutHandlerFunc)
 	GetRunTimeMemStats(nodeId string) (*runtime.MemStats, error)
 	Done()
