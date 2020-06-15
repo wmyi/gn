@@ -83,7 +83,49 @@ app.RPCRouter("rpcGetAllGroups", false, rpcGetAllGroups)
 ## 4:GN master 服务 样例及说明
 #### 目前GN master 模块 并没有 增加 启动，重启以及管理的 子节点的功能，而是简单的添加了  探知各个子节点，ping/pong心跳机制，以及master RPC 远程调用  其他子节点的注册函数，返回相应的 信息，以供开发者 获取 子节点对应的 子服务的信息。 例子如下：<br>
 ``` go 
+	// master 实例代码  master 调用   login-001 服务商的 online 方法
+	// routine  master  不要阻塞主协程
+	go func() {
+		for {
+			time.Sleep(3 * time.Second)
+			req := message.CmdOnlineReq{
+				Admin: "test",
+				Msg:   "test test test",
+			}
+								// 参数说明 cmd： API名字 ，需要唯一性， 明确指出 RPC  调用的APIname
+								// nodeId ：服务唯一ID，具体参考 配置文件
+								// obj  : RPC  远程调用的参数 
+			results, err := master.SendCMDJson("online", "login-001", req)
+			if err != nil {
+				logger.Infof("master.SendCMD online error  %v   \n ", err)
+				return
+			}
+			if len(results) > 0 {
+				res := &message.CmdOnlineRes{}
+				jsonI.Unmarshal(results, res)
+				logger.Infof("master.SendCMD -- online  results  %v ", res)
+			}
 
+		}
+	}()
+
+	// 节点 login-001 实现  online  方法 实例
+	// master cmd  command
+	app.CMDHandler("online", func(pack gn.IPack) {
+		req := &message.CmdOnlineReq{}
+		logger.Infof("online Cmd--    %v \n", string(pack.GetData()))
+		if err = jsonI.Unmarshal(pack.GetData(), req); err == nil {
+			logger.Infof("  online    req    %v \n ", req)
+			if req.Admin == "test" {
+				response := &message.CmdOnlineRes{
+					ServerId: "login-001",
+					Msg:      "onLine test  test",
+				}
+				logger.Infof("  online    response    %v \n ", response)
+				pack.ResultJson(response)
+			}
+		}
+	})
 
 ```
 
