@@ -325,7 +325,7 @@ app.RPCRouter("rpcGetAllGroups", false, rpcGetAllGroups)
 ------------
 ## 8: Config  说明 以及样例
  #### config 主要是 多个游戏服务的 服务配置， 不涉及到业务逻辑 ，业务逻辑 请参考 App.setConfig  的viper模块
- ```json 
+ ```javascript 
 	// 配置文件JSON说明 后续会增加 服务 所有ID 均需唯一，来区分唯一性
 	{
 		// nats  中间件 配置 ，所有消息包的中转，等等都需要用到 nats 
