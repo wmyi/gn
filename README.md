@@ -315,10 +315,10 @@ app.RPCRouter("rpcGetAllGroups", false, rpcGetAllGroups)
 ------------
 
 ## 7: Nats 消息中间件服务 说明
-#### Nats  过多的 官话，我就不说了，请参考 https://nats.io/ ，GitHub:https://github.com/nats-io/go-nats
+#### Nats  过多的 官话，我就不说了，请参考官网  https://nats.io/ ，GitHub:https://github.com/nats-io/go-nats
 
 ##### 1：下载对应系统的版本，
-##### 2：因为是可执行文件，可以直接执行，启动， 具体 其他配置可以  参考官网 
+##### 2：因为是可执行文件，可以直接执行，./nats-server -DV 启动， 具体 其他配置以及配置文件  参考官网  
 ##### 3：GN框架主要用了，nats 的go 的客户端包  github.com/nats-io/nats.go
 ##### 4: 启动完毕 nats ，请把 nats的  URL 配置到  config 配置
 
@@ -326,29 +326,38 @@ app.RPCRouter("rpcGetAllGroups", false, rpcGetAllGroups)
 ## 8: Config  说明 以及样例
  #### config 主要是 多个游戏服务的 服务配置， 不涉及到业务逻辑 ，业务逻辑 请参考 App.setConfig  的viper模块
  ```json 
-	// 配置文件JSON说明 后续会增加
+	// 配置文件JSON说明 后续会增加 服务 所有ID 均需唯一，来区分唯一性
 	{
+		// nats  中间件 配置 ，所有消息包的中转，等等都需要用到 nats 
+		// 暂时是必配选项
 		"natsconfig":{
 			"host":"nats://fpp:bar@localhost",
 			"port":4222
 		},
+		// connector 服务器 配置，可以是多个，connector 
+		// 根据NGINX或者其他 负载均衡到 对应 connector
+		// 均为必配选项
 		"connector":[
 			{
-			"id":"connector001",
+			"id":"connector001",// ID必须 唯一
 			"host": "0.0.0.0",
 			"clientPort": 12007,
-			"frontend": true,
-			"heartTime":5,
-			"serverType":"connector"
+			"frontend": true, // 是否为前端 服务器
+			"heartTime":5, // 心跳时间，和客户端 单位为秒
+			"serverType":"connector"  // 服务类型 
 			}
 		],
+		// 业务逻辑服务器 
+		// Id 均需 唯一
+		// serverType 相同 会 认为是一组相同类型的业务服务器  
+		// 时间单位 均为秒
 		"servers":[
 			{
 				"id":"login-001",
 				"serverType":"login",
-				"handleTimeOut":10,
-				"rpcTimeOut":5,
-				"maxRunRoutineNum":10240
+				"handleTimeOut":10, // handler 执行逻辑 超时时长
+				"rpcTimeOut":5, 	// RPC  远程调用 超时 时间 
+				"maxRunRoutineNum":10240 // 服务最大 同时执行业务 ，所开启的协程最大数量，超过最大数量会卡住 channel
 			},
 			{
 				"id":"chat-001",
@@ -358,15 +367,18 @@ app.RPCRouter("rpcGetAllGroups", false, rpcGetAllGroups)
 				"maxRunRoutineNum":10240
 			}
 		],
+		// master 服务 非必配选择，
+		// 如果不启动master 服务，可以不配置该 选项
 		"master":{
 			"id":"master",
-			"nodeHeartBeart":10
+			"nodeHeartBeart":10  // 服务子节点 失联 心跳  时间 10秒
 		},
+		//  log日志文件 配置 
 		"log":{
-			"encoding": "utf-8",
-			"level":"All",
-			"maxLogSize": 10485760,
-			"numBackups":10
+			"encoding": "utf-8", // 编码
+			"level":"All", 	// 日志级别 ，
+			"maxLogSize": 10485760,// 日志文件 大小  超过该大小会 再次分割文件
+			"numBackups":10 // 最大备份文件数量，超过 文件数，会重新回滚 覆盖
 		}
 	}
  ```
