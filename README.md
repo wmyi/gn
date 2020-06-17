@@ -132,19 +132,244 @@ app.RPCRouter("rpcGetAllGroups", false, rpcGetAllGroups)
 
 ------------
 ## 5: GN APP 服务 样例及说明
-#### GN APP 
+#### GN APP  是整个游戏框架的核心，所有的业务逻辑基本都在此APP，也是开发者接触最多的地方。 包括注册API，RPC的API，以及中间件等等
+``` go
+	//1 app 创建 例子
+	config, err := config.NewConfig("../../config/development.json")
+	if err != nil {
+		logger.Infof("config  error\n ", err)
+		return
+	}
+	app, err := gn.DefaultApp(config) // 默认创建APP，项目
+	if err != nil {
+		logger.Infof("new APP error %v \n", err)
+		return
+	}
+	err = app.Run()
+	if err != nil {
+		logger.Infof("loginApp run   error   %v \n", err)
+		return
+	}
+	defer app.Done()
+	// config 配置json 会在后续说明 或者参考 chat项目
 
+	//2 注册API  例子
+	func InitAPIRouter(app gn.IApp) {
+		app.APIRouter("login", true, Login)
+		app.APIRouter("logout", true, Logout)
+		app.APIRouter("chat", false, Chat)
+		app.APIRouter("wsclose", true, WsClosedHandler)
+	}
+	func InitRPCRouter(app gn.IApp) {
+		app.RPCRouter("rpcGetAllUsers", false, rpcGetAllUsers)
+		app.RPCRouter("notifyCreateGroup", false, notifyCreateGroup)
+	}
+	// 根据自己的 需求  是否单独分开文件  参数简介 ：API  名字，是否开启新协程，调用此方法，函数
+
+	// 3 添加 逻辑配置文件 样例
+	// 具体viper 使用可以参考  "github.com/spf13/viper"  开源项目
+	app.AddConfigFile("test", "../../config/", "yaml")
+	//4 添加 中间件 文件 样例
+	app.UseMiddleWare(&middlerware.PackTimer{})
+	// 中间件样例 接口
+	type GNMiddleWare interface {
+		Before(IPack)
+		After(IPack)
+	}
+	// 实现样例
+	type PackTimer struct {
+	}
+
+	func (t *PackTimer) Before(pack gn.IPack) {
+		reqId := rand.Intn(1 << 10)
+		nowTime := time.Now()
+		pack.SetContextValue("reqId", reqId)
+		pack.SetContextValue("inTime", nowTime)
+		logger.Infof("Before reqId: %d    time %v  ", reqId, nowTime)
+	}
+
+	func (t *PackTimer) After(pack gn.IPack) {
+		reqId := pack.GetContextValue("reqId").(int)
+		nowTime := pack.GetContextValue("inTime").(time.Time)
+		logger.Infof("After reqId: %d   diff time %v  ", reqId, time.Now().Sub(nowTime))
+	}
+	//5 API 注册 接口样例 & RPC接口 样例
+	// 聊天
+	// API  
+	app.APIRouter("chat", false, Chat)
+
+
+	func Chat(pack gn.IPack) {
+
+		logger.Infof("loginApp  Chat   pack  data %v \n", string(pack.GetData()))
+
+		//unmarshal json
+		reqData := &message.LoginReq{}
+		// request  data
+		if len(pack.GetData()) > 0 {
+			err := jsonI.Unmarshal(pack.GetData(), reqData)
+			if err != nil {
+				pack.ExceptionAbortJson("101", "解析前端数据失败 JSON ")
+				return
+			}
+		}
+		// logic
+		// response to connector
+		app := pack.GetAPP()
+		if len(reqData.Bridge) > 0 {
+			group, ok := app.GetGroup("userSession")
+			if ok && group != nil {
+				for _, uid := range reqData.Bridge {
+					s, ok := group.GetSession(uid)
+					if ok && s != nil {
+						respon := &message.ChatRes{
+							Router:   "chat",
+							Date:     time.Now().Format("2006-01-02 15:04:05"),
+							Msg:      reqData.Msg,
+							Nickname: reqData.Nickname,
+							UID:      reqData.UID,
+							Bridge:   reqData.Bridge,
+							GroupID:  reqData.GroupID,
+							Status:   1,
+						}
+						// push other user msg
+						app.PushJsonMsg(s, respon)
+					}
+				}
+			}
+		}
+	}
+	// RPC 
+	app.RPCRouter("rpcGetAllUsers", false, rpcGetAllUsers)
+	func rpcGetAllUsers(pack gn.IPack) {
+		// get all groups return
+
+		users, ok := pack.GetAPP().GetObjectByTag("userList")
+		if ok && users != nil {
+			if mUsers, ok := users.(map[string]*model.UserMode); ok {
+				userList := make([]interface{}, 0, len(mUsers))
+				for _, item := range mUsers {
+					userList = append(userList, item)
+				}
+				pack.ResultJson(userList)
+				pack.SetRPCRespCode(0)
+			} else {
+				pack.SetRPCRespCode(102)
+			}
+
+			return
+		}
+
+		pack.SetRPCRespCode(101)
+	}
+```
 
 ------------
 ## 6: GN Connector 服务 样例及说明
-#### 目前 Gn Connector 中仅仅支持 websocket 连接，并使用 github.com/gorilla/websocket 该包，connector 包中  
+#### 目前 Gn Connector 中仅仅支持 websocket 连接，并使用 github.com/gorilla/websocket 该包，connector 包中 主要是 管理前端websocket连接以及消息包的路由算法。和 连接验证等等一些方法 
+```go 
+// 样例
+	config, err := config.NewConfig("../../config/development.json")
+	if err != nil {
+		logger.Infof("config  error ", err)
+		return
+	}
+	// logger.Infof("config:      %v  \n  ", config)
+	connector, err := connector.DefaultConnector(config)
+	if err != nil {
+		logger.Infof("new DefaultConnect  error ", err)
+		return
+	}
+	// exception handler
+	connector.AddExceptionHandler(func(exception *gnError.GnException) {
+		// close handler push msg
+		if exception.Exception == gnError.WS_CLOSED && len(exception.BindId) > 0 && len(exception.Id) > 0 {
+			handlerName := "wsclose"
+			serverAddress := connector.GetServerIdByRouter(handlerName, exception.BindId, exception.Id,
+				config.GetServerByType("login"))
+			connector.SendPack(serverAddress, handlerName, exception.BindId, exception.Id, nil)
+		}
+	})
+
+	// set pack  route 路由消息 算法
+	connector.AddRouterRearEndHandler("connector", connectorRoure)
+	err = connector.Run()
+	if err != nil {
+		logger.Infof("connector run   error   %v \n", err)
+		return
+	}
+	defer connector.Done()
+
+	func connectorRoure(cid string, bindId string, serverList []*config.ServersConfig) string {
+		if len(bindId) > 0 {
+			index := int(crc32.ChecksumIEEE([]byte(bindId))) % len(serverList)
+			if serverList[index] != nil {
+				return serverList[index].ID
+			}
+		}
+		return ""
+	}
+``` 
 
 
 ------------
 
 ## 7: Nats 消息中间件服务 说明
-#### 目前 Gn Connector 中仅仅支持 websocket 连接，并使用 github.com/gorilla/websocket 该包，connector 包中  
+#### Nats  过多的 官话，我就不说了，请参考 https://nats.io/ ，GitHub:https://github.com/nats-io/go-nats
 
+##### 1：下载对应系统的版本，
+##### 2：因为是可执行文件，可以直接执行，启动， 具体 其他配置可以  参考官网 
+##### 3：GN框架主要用了，nats 的go 的客户端包  github.com/nats-io/nats.go
+##### 4: 启动完毕 nats ，请把 nats的  URL 配置到  config 配置
+
+------------
+## 8: Config  说明 以及样例
+ #### config 主要是 多个游戏服务的 服务配置， 不涉及到业务逻辑 ，业务逻辑 请参考 App.setConfig  的viper模块
+ ```json 
+	// 配置文件JSON说明 后续会增加
+	{
+		"natsconfig":{
+			"host":"nats://fpp:bar@localhost",
+			"port":4222
+		},
+		"connector":[
+			{
+			"id":"connector001",
+			"host": "0.0.0.0",
+			"clientPort": 12007,
+			"frontend": true,
+			"heartTime":5,
+			"serverType":"connector"
+			}
+		],
+		"servers":[
+			{
+				"id":"login-001",
+				"serverType":"login",
+				"handleTimeOut":10,
+				"rpcTimeOut":5,
+				"maxRunRoutineNum":10240
+			},
+			{
+				"id":"chat-001",
+				"serverType":"chat",
+				"handleTimeOut":10,
+				"rpcTimeOut":5,
+				"maxRunRoutineNum":10240
+			}
+		],
+		"master":{
+			"id":"master",
+			"nodeHeartBeart":10
+		},
+		"log":{
+			"encoding": "utf-8",
+			"level":"All",
+			"maxLogSize": 10485760,
+			"numBackups":10
+		}
+	}
+ ```
 
 ------------
 
