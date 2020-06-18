@@ -402,7 +402,7 @@ git clone https://github.com/wmyi/gnchatdemo
 ##### 3):在gnchatDemo 目录 打开命令行 执行 docker-compose up  命令
 ##### 4):如果不报错，就OK 启动成功 （注意第一次可能会慢一些，因为 需要dockerhub ，拉去 相关镜像）
 ##### docker相关启动截图 <br>
-![dockerps-start](./doc/img/dockerps-start.jpg "dockerps-start") <br>
+![dockerps_start](./doc/img/dockerps_start.jpg "dockerps_start") <br>
 ##### 其中 NGINX服务 是 web静态网页 渲染用 <br>
 ##### 5):打开浏览器，输入  http://localhost:8080/#/ 如果弹出 让你输入昵称的 输入框，就证明启动OK <br>
 ##### 6):相关截图 <br>
