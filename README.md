@@ -396,19 +396,19 @@ git clone https://github.com/wmyi/gnchatdemo
 ```
 
 #### 1 docker-compose 单机部署
-	gnchatDemo 相应的docker文件已经写好， 需要 大家安装好 docker和docker-compose 插件 ，
-	1：Mac 安装docker 会自动安装 docker-compose 插件
-	2：win 需要大家自己安装 docker-compose 插件
-	3：在gnchatDemo 目录 打开命令行 执行 docker-compose up  命令
-	4：如果不报错，就OK 启动成功 （注意第一次可能会慢一些，因为 需要dockerhub ，拉去 相关镜像）
-	docker相关启动截图
-![dockerps-start](./doc/img/dockerps-start.jpg"dockerps-start")
-	其中 NGINX服务 是 web静态网页 渲染用
-	5：打开浏览器，输入  http://localhost:8080/#/ 如果弹出 让你输入昵称的 输入框，就证明启动OK 
-	6：相关截图 <br>
-![chat_1](./doc/img/chat_1.jpg"chat_1")
-![chat_2](./doc/img/chat_2.jpg"chat_2")
-![chat_3](./doc/img/chat_3.jpg"chat_3")
+	gnchatDemo 相应的docker文件已经写好， 需要 大家安装好 docker和docker-compose 插件 ，<br>
+	1:Mac 安装docker 会自动安装 docker-compose 插件
+	2:win 需要大家自己安装 docker-compose 插件
+	3:在gnchatDemo 目录 打开命令行 执行 docker-compose up  命令
+	4:如果不报错，就OK 启动成功 （注意第一次可能会慢一些，因为 需要dockerhub ，拉去 相关镜像）
+	docker相关启动截图 <br>
+![dockerps-start](./doc/img/dockerps-start.jpg "dockerps-start") <br>
+	其中 NGINX服务 是 web静态网页 渲染用 <br>
+	5:打开浏览器，输入  http://localhost:8080/#/ 如果弹出 让你输入昵称的 输入框，就证明启动OK <br>
+	6:相关截图 <br>
+![chat_1](./doc/img/chat_1.jpg "chat_1")<br>
+![chat_2](./doc/img/chat_2.jpg "chat_2")<br>
+![chat_3](./doc/img/chat_3.jpg "chat_3")<br>
 
 
 #### 2 单个服务部署 需要 配置好golang 服务环境 和node 环境 因为 web前端界面渲染需要node环境
@@ -417,7 +417,7 @@ git clone https://github.com/wmyi/gnchatdemo
 	2: 启动 connector ，login，chat，master等相关服务<br>
 		 cd 进入 gnchatdemo/app/connector/ 目录下<br>
 		 执行 go run connector -serverId connector001  -mode debug  // serverId 是用来确认服务唯一性，必须唯一性，和配置文件里面的connector ID 必须一样 -mode debug 代表 log 输出到控住台，不输入该参数，默认写到配置文件所配置的 logs文件夹  启动成功如下 <br>
-![connector-start](./doc/img/connector-start.jpg"connector-start")<br>
+![connector-start](./doc/img/connector-start.jpg "connector-start")<br>
 		 其他服务 类似connector 逐个启动就OK，切记master  不需要 输入serverId  因为默认 集群就一个 master 所以省略了，直接 go run chatMaster.go  -mode debug 即可<br>
 		 也可以根据自己 需要选择是否 为debug 模式   -mode 为 可选项<br>
 	3：启动web服务 因为是node的服务，所以需要安装 npm 包
