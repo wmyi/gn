@@ -402,32 +402,32 @@ git clone https://github.com/wmyi/gnchatdemo
 	3：在gnchatDemo 目录 打开命令行 执行 docker-compose up  命令
 	4：如果不报错，就OK 启动成功 （注意第一次可能会慢一些，因为 需要dockerhub ，拉去 相关镜像）
 	docker相关启动截图
-	![dockerps-start](./doc/img/dockerps-start.jpg "dockerps-start")
+	![dockerps-start](./doc/img/dockerps-start.jpg"dockerps-start")
 	其中 NGINX服务 是 web静态网页 渲染用
 	5：打开浏览器，输入  http://localhost:8080/#/ 如果弹出 让你输入昵称的 输入框，就证明启动OK 
 	6：相关截图
-	![chat_1](./doc/img/chat_1.jpg "chat_1")
-	![chat_2](./doc/img/chat_2.jpg "chat_2")
-	![chat_3](./doc/img/chat_3.jpg "chat_3")
+	![chat_1](./doc/img/chat_1.jpg"chat_1")
+	![chat_2](./doc/img/chat_2.jpg"chat_2")
+	![chat_3](./doc/img/chat_3.jpg"chat_3")
 
 
 #### 2 单个服务部署 需要 配置好golang 服务环境 和node 环境 因为 web前端界面渲染需要node环境
 	1：下载nats 对应系统版本 并启动  ./nats-server -DV  启动完成如下图 <br>
-	![nats-start](./doc/img/nats-start.jpg "nats-start") <br>
+	![nats-start](./doc/img/nats-start.jpg"nats-start") <br>
 	2: 启动 connector ，login，chat，master等相关服务<br>
-		- cd 进入 gnchatdemo/app/connector/ 目录下<br>
-		- 执行 go run connector -serverId connector001  -mode debug  // serverId 是用来确认服务唯一性，必须唯一性，和配置文件里面的connector ID 必须一样 -mode debug 代表 log 输出到控住台，不输入该参数，默认写到配置文件所配置的 logs文件夹  启动成功如下 <br>
-		- ![connector-start](./doc/img/connector-start.jpg "connector-start")<br>
-		- 其他服务 类似connector 逐个启动就OK，切记master  不需要 输入serverId  因为默认 集群就一个 master 所以省略了，直接 go run chatMaster.go  -mode debug 即可<br>
-		- 也可以根据自己 需要选择是否 为debug 模式   -mode 为 可选项<br>
+		 cd 进入 gnchatdemo/app/connector/ 目录下<br>
+		 执行 go run connector -serverId connector001  -mode debug  // serverId 是用来确认服务唯一性，必须唯一性，和配置文件里面的connector ID 必须一样 -mode debug 代表 log 输出到控住台，不输入该参数，默认写到配置文件所配置的 logs文件夹  启动成功如下 <br>
+		 ![connector-start](./doc/img/connector-start.jpg"connector-start")<br>
+		 其他服务 类似connector 逐个启动就OK，切记master  不需要 输入serverId  因为默认 集群就一个 master 所以省略了，直接 go run chatMaster.go  -mode debug 即可<br>
+		 也可以根据自己 需要选择是否 为debug 模式   -mode 为 可选项<br>
 	3：启动web服务 因为是node的服务，所以需要安装 npm 包
-		- cd 进入 gnchatdemo/app/web/ 有package.json
+		 cd 进入 gnchatdemo/app/web/ 有package.json
 		输入命令：  npm install   如果不报错，安装完所有依赖包
-		- 输入 npm run dev  一切顺利  会提示 lisenter http://localhost:8080/
-		- 在浏览器 输入 http://localhost:8080/ 弹出 输入昵称 输入框。
-		- 大功告成
+		 输入 npm run dev  一切顺利  会提示 lisenter http://localhost:8080/
+		 在浏览器 输入 http://localhost:8080/ 弹出 输入昵称 输入框。<br>
+		 大功告成
 
- #### [gnchatdemo](https://github.com/wmyi/gnchatdemo "gnchatdemo")
+ #### [gnchatdemo](https://github.com/wmyi/gnchatdemo"gnchatdemo")
  #### 部署 GNchat demo  单机开发建议 用docker-compose  方便 多服务管理！
  #### 线上 可以根据 自己情况是否用docker，或者 直接启动二进制文件。都可以
 
