@@ -22,6 +22,8 @@ type ServersConfig struct {
 	ServerType       string `json:"serverType"`
 	HandleTimeOut    int    `json:"handleTimeOut"`
 	RPCTimeOut       int    `json:"rpcTimeOut"`
+	Host             string `json:"host"` // rpc host使用，nats RPC的时候不需要这两个值
+	Port             string `json:"port"` // rpc 端口   nats 不需要
 	MaxRunRoutineNum int    `json:"maxRunRoutineNum"`
 }
 
@@ -29,7 +31,10 @@ type ConnectorConfig struct {
 	ID         string `json:"id"`
 	Host       string `json:"host"`
 	ClientPort int    `json:"clientPort"`
+	EndPort    int    `json:"endPort"`
 	Frontend   bool   `json:"frontend"`
+	HeartTime  int    `json:"heartTime"`
+	ServerType string `json:"serverType"`
 }
 type Natsconfig struct {
 	Host string `json:"host"`
@@ -49,12 +54,12 @@ type MasterConfig struct {
 }
 
 type Config struct {
-	Natsconf   Natsconfig   `json:"natsconfig"`
-	MasterConf MasterConfig `json:"master"`
-	LogConf    LogConfig    `json:"log"`
-
-	Connector []*ConnectorConfig `json:"connector"`
-	Servers   []*ServersConfig   `json:"servers"`
+	Natsconf   Natsconfig         `json:"natsconfig"`
+	MasterConf MasterConfig       `json:"master"`
+	LogConf    LogConfig          `json:"log"`
+	Rpctype    string             `json:"rpctype"` // rpc type  nats  or  rpcx
+	Connector  []*ConnectorConfig `json:"connector"`
+	Servers    []*ServersConfig   `json:"servers"`
 
 	typeServer map[string][]*ServersConfig
 }
