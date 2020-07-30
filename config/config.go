@@ -57,7 +57,7 @@ type Config struct {
 	Natsconf   Natsconfig         `json:"natsconfig"`
 	MasterConf MasterConfig       `json:"master"`
 	LogConf    LogConfig          `json:"log"`
-	Rpctype    string             `json:"rpctype"` // rpc type  nats  or  rpcx
+	Rpctype    string             `json:"rpctype"` // rpc type  nats  or  rpc
 	Connector  []*ConnectorConfig `json:"connector"`
 	Servers    []*ServersConfig   `json:"servers"`
 

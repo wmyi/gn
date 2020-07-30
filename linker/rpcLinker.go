@@ -1,51 +1,103 @@
 package linker
 
 import (
+	"net"
+	"runtime/debug"
+	"sync"
+	"time"
+
 	"github.com/wmyi/gn/config"
-	"github.com/wmyi/gn/glog"
+	logger "github.com/wmyi/gn/glog"
 	"github.com/wmyi/gn/gnError"
-	"go.etcd.io/etcd/client"
+)
+
+var (
+	pendPackMapMux sync.RWMutex
 )
 
 type RpcLinker struct {
-	CWChan        chan []byte
-	serverAddr    string
-	serverID      string
-	isRuning      bool
-	exDetect      *gnError.GnExceptionDetect
-	conf          *config.Config
-	clientConMaps map[string]*client.Client
+	CWChan     chan []byte
+	serverAddr string
+	serverID   string
+	isRuning   bool
+	//ConnectTimeout sets timeout for dialing
+	ConnectTimeout  time.Duration
+	exDetect        *gnError.GnExceptionDetect
+	conf            *config.Config
+	NodeConMaps     map[string]*NodeConnection
+	NodeServer      *RpcServer
+	pendingPackMaps map[string][][]byte
 }
 
-func NewRpcxLinker(serverId string, config *config.Config, address string, outChan chan []byte, log *glog.Glogger,
+func NewRpcLinker(serverId string, config *config.Config, address string, outChan chan []byte,
 	detect *gnError.GnExceptionDetect) ILinker {
-	rpcx := &RpcLinker{
-		CWChan:        outChan,
-		serverAddr:    address,
-		serverID:      serverId,
-		isRuning:      false,
-		exDetect:      detect,
-		clientConMaps: make(map[string]*client.Client, 1<<4), // grpc clients  serverId:rpcxClient
-		conf:          config,
+	rpc := &RpcLinker{
+		CWChan:          outChan,
+		serverAddr:      address,
+		serverID:        serverId,
+		isRuning:        false,
+		exDetect:        detect,
+		NodeConMaps:     make(map[string]*NodeConnection, 1<<4), // rpc nodeConnection  serverId:nodeConnection
+		conf:            config,
+		pendingPackMaps: make(map[string][][]byte),
+		ConnectTimeout:  time.Second * 10,
 	}
-	return rpcx
+	rpc.NodeServer = NewRpcServer(serverId, address)
+	return rpc
+}
+
+func (rl *RpcLinker) SendPendingPack() {
+
 }
 
 func (rl *RpcLinker) SendMsg(router string, data []byte) {
 	if len(router) > 0 && len(data) > 0 {
-		if con, ok := rl.clientConMaps[router]; ok && con != nil {
+		if con, ok := rl.NodeConMaps[router]; ok && con != nil {
+			con.Write(router, data)
 		} else {
+			// connect remote connection
+			// add pending map
+			if slicePack, ok := rl.pendingPackMaps[router]; ok && slicePack != nil {
 
+			}
+			go rl.ConnectRometeServer(router)
 		}
 	}
 }
+
+func (rl *RpcLinker) ConnectRometeServer(serverId string) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Errorf("rpcLinker ConnectRometeServer Routine  ", string(debug.Stack()))
+		}
+	}()
+	// get address
+
+	// connect
+	conn, err := net.DialTimeout("tcp", serverId, rl.ConnectTimeout)
+	if err != nil {
+
+		logger.Errorf("rpcLinker ConnectRometeServer connectTimeout   ", string(debug.Stack()))
+		return
+	}
+
+}
+
 func (rl *RpcLinker) GetSubRounter() string {
 	return rl.serverID
 }
+
 func (rl *RpcLinker) Run() error {
 	if !rl.isRuning {
-
 		rl.isRuning = true
+		if rl.NodeServer != nil {
+			// new go routine  listen server
+			err := rl.NodeServer.RunListen()
+			if err != nil {
+				return err
+			}
+		}
+
 	}
 	return nil
 }
